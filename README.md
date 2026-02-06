@@ -30,13 +30,17 @@ Get your API token from the Qlerify UI.
 
 ## Installation
 
-```bash
-# Install sync skill
-claude skill add qlerify/claude-skills:sync
+In Claude Code, run:
 
-# Install download skill
-claude skill add qlerify/claude-skills:download
+```bash
+# Add the Qlerify marketplace
+/plugin marketplace add qlerify/claude-skills
+
+# Install the plugin
+/plugin install qlerify@qlerify-skills
 ```
+
+After installation, skills are available as `/qlerify:sync` and `/qlerify:download`.
 
 ## Skills
 
@@ -78,14 +82,14 @@ standard MCP tools for large data.
 
 ## Usage Examples
 
-```
-# Sync your code with Qlerify
+```bash
+# Invoke skills directly
+/qlerify:sync
+/qlerify:download
+
+# Or just ask naturally - skills trigger automatically
 > sync my domain model with Qlerify
-
-# Download workflow to file
 > download the Cart Microservice workflow to workflow.json
-
-# Get OpenAPI spec
 > save the swagger spec for my workflow to api.yaml
 ```
 
