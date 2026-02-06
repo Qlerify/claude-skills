@@ -10,7 +10,8 @@ allowed-tools: Glob, Grep, Read
 
 # Sync Domain Model with Qlerify
 
-Sync the local codebase's domain model with Qlerify. Detect entities, commands, and read models in code and ensure they match Qlerify.
+Sync the local codebase's domain model with Qlerify. Detect entities, commands, and read models in code and ensure they
+match Qlerify.
 
 ## Step 1: Identify the workflow
 
@@ -22,8 +23,10 @@ Sync the local codebase's domain model with Qlerify. Detect entities, commands, 
 
 Look for:
 
-- **Entities**: Classes, interfaces, or schemas representing persistent domain objects (database models, ORM entities, TypeScript interfaces).
-- **Commands**: Functions or DTOs for state-changing operations (`CreateOrder`, `UpdateCustomer`, POST/PUT/DELETE endpoints).
+- **Entities**: Classes, interfaces, or schemas representing persistent domain objects (database models, ORM entities,
+  TypeScript interfaces).
+- **Commands**: Functions or DTOs for state-changing operations (`CreateOrder`, `UpdateCustomer`, POST/PUT/DELETE
+  endpoints).
 - **Read Models**: Query handlers or GET endpoints (`GetOrderById`, `ListProducts`).
 
 Search patterns:
@@ -40,9 +43,9 @@ Also check git diff for recently changed schema files to detect field-level chan
 1. Call `list_entities`, `list_commands`, and `list_read_models` from Qlerify.
 2. Compare code vs Qlerify.
 3. For differences:
-   - **New in code**: Create in Qlerify with proper fields and example data.
-   - **Changed fields**: Update Qlerify definition using `addFields`, `updateFields`, `removeFields`.
-   - **Removed from code**: Ask user before deleting from Qlerify.
+    - **New in code**: Create in Qlerify with proper fields and example data.
+    - **Changed fields**: Update Qlerify definition using `addFields`, `updateFields`, `removeFields`.
+    - **Removed from code**: Ask user before deleting from Qlerify.
 
 ## Step 4: Report changes
 

@@ -10,7 +10,8 @@ allowed-tools: Bash, Read, Glob
 
 # Fast Download Qlerify Data
 
-**CRITICAL:** When saving ANY Qlerify data to a file, use `curl + jq` instead of MCP tools. MCP responses pass through AI context which takes minutes for large data. Shell pipes take seconds.
+**CRITICAL:** When saving ANY Qlerify data to a file, use `curl + jq` instead of MCP tools. MCP responses pass through
+AI context which takes minutes for large data. Shell pipes take seconds.
 
 ## Step 1: Find MCP credentials
 
@@ -71,11 +72,11 @@ curl -s "$MCP_URL" -H "x-api-key: $API_KEY" -H "Content-Type: application/json" 
 
 ## When to use what
 
-| Data size | Method | Example |
-|-----------|--------|---------|
-| Small (< 50 lines) | MCP tool | `list_workflows`, `get_workflow_overview` |
+| Data size          | Method    | Example                                                                        |
+|--------------------|-----------|--------------------------------------------------------------------------------|
+| Small (< 50 lines) | MCP tool  | `list_workflows`, `get_workflow_overview`                                      |
 | Large (> 50 lines) | curl + jq | `get_workflow`, `generate_openapi_spec`, `list_entities`, `list_domain_events` |
-| Any "save to file" | curl + jq | Always, regardless of size |
+| Any "save to file" | curl + jq | Always, regardless of size                                                     |
 
 ## Finding IDs first
 
