@@ -1,16 +1,18 @@
-# Qlerify Claude Code Skills
+# Qlerify Skills
 
-Claude Code skills for integrating with [Qlerify](https://qlerify.com) - keep your domain model in sync with your
-codebase.
+Skills for integrating with [Qlerify](https://qlerify.com) - keep your domain model in sync with your codebase. Works
+with Claude Code, Gemini CLI, and Cursor.
 
 ## Prerequisites
 
 1. **Qlerify account** with a workflow created
-2. **Qlerify MCP server** configured in Claude Code with your API token
+2. **Qlerify MCP server** configured with your API token (see setup per tool below)
 
-### Configure MCP Server
+## Installation
 
-Add to your Claude Code MCP settings (`~/.claude/settings.local.json`):
+### Claude Code
+
+Configure MCP server in `~/.claude/settings.local.json`:
 
 ```json
 {
@@ -26,11 +28,7 @@ Add to your Claude Code MCP settings (`~/.claude/settings.local.json`):
 }
 ```
 
-Get your API token from the Qlerify UI.
-
-## Installation
-
-In Claude Code, run:
+Install the plugin:
 
 ```bash
 # Add the Qlerify marketplace
@@ -41,6 +39,28 @@ In Claude Code, run:
 ```
 
 After installation, skills are available as `/qlerify:sync` and `/qlerify:download`.
+
+### Gemini CLI
+
+Install each skill using the `--path` flag:
+
+```bash
+gemini skills install https://github.com/qlerify/claude-skills.git --path skills/sync
+gemini skills install https://github.com/qlerify/claude-skills.git --path skills/download
+```
+
+Configure the Qlerify MCP server in `~/.gemini/settings.json` per
+[Gemini CLI docs](https://geminicli.com/docs/cli/mcp/).
+
+### Cursor
+
+1. Open Cursor Settings (`Cmd+Shift+J`)
+2. Go to **Rules** > **Add Rule** > **Remote Rule (Github)**
+3. Enter: `https://github.com/qlerify/claude-skills.git`
+
+Configure the Qlerify MCP server in Cursor's MCP settings.
+
+Get your API token from the Qlerify UI.
 
 ## Skills
 
