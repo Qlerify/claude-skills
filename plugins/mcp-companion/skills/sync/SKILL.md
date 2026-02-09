@@ -1,10 +1,11 @@
 ---
 name: sync
 description: >
-  Sync domain model with Qlerify. Use when the user says "sync domain model",
+  This skill should be used when the user asks to "sync domain model",
   "update Qlerify", "push changes to Qlerify", "sync schemas", "sync entities",
   or after implementing features that add or change entities, API endpoints,
-  database schemas, migrations, or Prisma/GraphQL types.
+  database schemas, migrations, or Prisma/GraphQL types. Syncs the local
+  codebase's domain model with Qlerify.
 allowed-tools: Glob, Grep, Read
 ---
 
@@ -21,7 +22,7 @@ match Qlerify.
 
 ## Step 2: Scan codebase for domain objects
 
-Look for:
+Scan for the following:
 
 - **Entities**: Classes, interfaces, or schemas representing persistent domain objects (database models, ORM entities,
   TypeScript interfaces).

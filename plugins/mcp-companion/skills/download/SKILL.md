@@ -1,10 +1,10 @@
 ---
 name: download
 description: >
-  Fast download any Qlerify data to files. Use when the user asks to
-  "save to file", "download", "export", "store in file", or any request
-  that involves getting data from Qlerify and saving it locally.
-  This bypasses AI processing and is ~100x faster than MCP tools.
+  This skill should be used when the user asks to "save to file", "download",
+  "export", "store in file", or any request that involves getting data from
+  Qlerify and saving it locally. Bypasses AI processing and is ~100x faster
+  than MCP tools for large data exports.
 allowed-tools: Bash, Read, Glob
 ---
 

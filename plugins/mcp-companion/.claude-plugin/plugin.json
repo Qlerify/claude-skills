@@ -7,6 +7,8 @@
     "email": "support@qlerify.com"
   },
   "homepage": "https://qlerify.com",
+  "repository": "https://github.com/qlerify/qlerify-plugins",
+  "license": "MIT",
   "keywords": [
     "domain-driven-design",
     "ddd",
