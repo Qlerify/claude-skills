@@ -1,0 +1,8 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force JSON files to use LF
+*.json text eol=lf
+
+# Force VTL files to use LF
+*.vtl text eol=lf
