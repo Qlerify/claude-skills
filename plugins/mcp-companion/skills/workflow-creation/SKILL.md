@@ -21,8 +21,10 @@ A Qlerify workflow is a BPMN-style diagram combined with domain-driven design (D
 
 - **Lanes** — Horizontal swim lanes representing actors or systems (e.g., "Customer", "Payment Service")
 - **Groups** — Vertical columns representing phases or stages (e.g., "Order Placement", "Fulfillment")
-- **Domain Events** — The core building blocks placed at lane/group intersections. Each event represents something that happens in the business process (e.g., "Order Created", "Payment Received")
-- **Cards** — Requirements attached to events. Each event can have cards for Command, Aggregate Root, Read Model, Given-When-Then, and User Story
+- **Domain Events** — The core building blocks placed at lane/group intersections. Each event represents something that
+  happens in the business process (e.g., "Order Created", "Payment Received")
+- **Cards** — Requirements attached to events. Each event can have cards for Command, Aggregate Root, Read Model,
+  Given-When-Then, and User Story
 - **Entities** — Persistent domain objects (Aggregate Roots) with typed fields
 - **Commands** — State-changing operations with input fields
 - **Read Models** — Data queries/views with filter fields
@@ -74,23 +76,26 @@ business process.
 
 Call `create_entity` for each core domain object. Each entity represents a persistent data structure:
 - Include fields with `name`, `dataType`, `exampleData` (3 realistic values), `isRequired`
-- Mark primary keys with `primaryKey: true`
-- Use `relatedEntityId` and `cardinality` for foreign key references
+- Use `relatedEntityId` and `cardinality` to express entity relationships from the owning entity's perspective
 - Field types: `string`, `number`, `boolean`, `object`
 
 **Step 6 — Create commands**
 
-Call `create_command` for each state-changing operation. Name with action verbs (Create, Update, Delete, Submit, Cancel):
-- Include input fields that the user provides
+Call `create_command` for each state-changing operation. Name with action verbs (Create, Update, Delete, Submit,
+Cancel):
+
+- Command fields should correspond to fields on the aggregate root entity they modify
 - Mark auto-generated fields (IDs, timestamps) with `hideInForm: true`
-- Reference related entities via `relatedEntityId`
+- Use `relatedEntityId` and `cardinality` to reference related entities, with nested `fields` containing field names
+  from that entity
 
 **Step 7 — Create read models**
 
 Call `create_read_model` for each data retrieval view. Name with Get/List/Search prefixes:
 - Link to the source entity via `entityId`
-- Mark filter/search fields with `isFilter: true`
-- Include output fields the user sees
+- Fields represent the full query contract: both inputs and outputs
+- Set `isFilter: true` for query parameters (what you search by), omit for returned data fields
+- Use `relatedEntityId` on return fields that reference other entities, with nested `fields` for their field names
 
 ### Phase 4: Linking
 
@@ -106,7 +111,8 @@ Attach domain model elements to events by calling `create_card`:
 - **Aggregate Root card** — Links an entity to the event. One per event maximum.
 - **Read Model card** — Links a read model to the event. Requires `cardinality` ("one-to-one" or "one-to-many").
 
-Each card needs `eventId`, `cardTypeId`, and `schemaId` (the ID returned by `create_entity`, `create_command`, or `create_read_model` in earlier steps).
+Each card needs `eventId`, `cardTypeId`, and `schemaId` (the ID returned by `create_entity`, `create_command`, or
+`create_read_model` in earlier steps).
 
 ### Phase 5: Organization
 
@@ -157,4 +163,5 @@ For detailed natural-language descriptions of every MCP tool, parameters, and us
 ### Example Files
 
 For a complete worked example showing all 10 steps with realistic tool calls and data:
-- **`examples/ecommerce-workflow.md`** — End-to-end e-commerce order workflow creation with 3 lanes, 6 events, 2 entities, 3 commands, 2 read models, and a decision gateway
+- **`examples/ecommerce-workflow.md`** — End-to-end e-commerce order workflow creation with 3 lanes, 6 events, 2
+  entities, 3 commands, 2 read models, and a decision gateway

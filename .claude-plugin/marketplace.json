@@ -1,15 +1,17 @@
 {
   "name": "qlerify-plugins",
-  "version": "1.0.0",
-  "description": "Official Qlerify plugins for AI coding assistants — domain model sync, data export, and more",
   "owner": {
     "name": "Qlerify",
     "email": "support@qlerify.com"
   },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Official Qlerify plugins for AI coding assistants — domain model sync, data export, and more"
+  },
   "plugins": [
     {
       "name": "mcp-companion",
-      "description": "Teaches AI agents how to effectively use Qlerify's MCP server — domain model sync, fast data export, and more",
+      "description": "Teaches AI agents how to effectively use Qlerify's MCP server — domain model sync, workflow creation, fast data export, and more",
       "version": "0.2.0",
       "author": {
         "name": "Qlerify",
@@ -17,7 +19,16 @@
       },
       "source": "./plugins/mcp-companion",
       "category": "development",
-      "homepage": "https://qlerify.com"
+      "homepage": "https://qlerify.com",
+      "keywords": [
+        "domain-driven-design",
+        "ddd",
+        "domain-model",
+        "workflow",
+        "sync",
+        "qlerify",
+        "mcp"
+      ]
     }
   ]
 }

@@ -145,7 +145,7 @@ deleted event's parent, preserving the flow.
 ## Entity Tools
 
 Entities represent persistent domain objects — the data structures at the heart of the domain
-model. Think of them as database tables or ORM models.
+model.
 
 ### list_entities
 Get all entities in the workflow with their full field definitions. Use this to understand the
@@ -162,9 +162,8 @@ example data to make the model concrete.
   - `dataType` — One of: `string`, `number`, `boolean`, `object`
   - `exampleData` — Array of 3 realistic example values
   - `isRequired` — Whether the field is mandatory (true/false)
-  - `primaryKey` — Mark as true for the primary key field
-  - `relatedEntityId` — ID of another entity for foreign key references
-  - `cardinality` — `"one-to-one"` or `"one-to-many"` for references
+  - `relatedEntityId` — ID of another entity to express a relationship
+  - `cardinality` — `"one-to-one"` or `"one-to-many"` for reference fields with relatedEntityId
 
 ### update_entity
 Modify an entity — rename it, add/update/remove fields, or change its bounded context assignment.
@@ -194,8 +193,13 @@ Define a new command with input fields. Name with action verbs.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `name` — Command name with verb prefix (e.g., "CreateOrder", "CancelSubscription")
-- `fields` — Array of field definitions (same structure as entity fields)
-  - Use `hideInForm: true` for auto-generated fields like IDs and timestamps
+- `fields` — Array of field definitions:
+  - `name` — Field name in camelCase
+  - `isRequired` — Whether the field is required/mandatory
+  - `hideInForm` — Set true for auto-generated fields like IDs and timestamps
+  - `relatedEntityId` — ID of another entity to express a relationship
+  - `cardinality` — `"one-to-one"` or `"one-to-many"` for reference fields
+  - `fields` — Nested field names from the related entity (for reference fields with relatedEntityId)
 
 ### update_command
 Modify a command — rename or change fields.
@@ -204,7 +208,7 @@ Modify a command — rename or change fields.
 - `name` — New name (optional)
 - `addFields`, `updateFields`, `removeFields` — Field modifications
 
-### delete_command
+### delete_comman
 Remove a command. Also removes card references on events.
 
 - `workflowId`, `projectId`, `commandId` — Identifies the command
@@ -216,26 +220,29 @@ Remove a command. Also removes card references on events.
 Read models represent data queries and views — how data is retrieved and displayed. They
 correspond to GET API endpoints or query operations.
 
-### list_read_models
+### list_read_model
 Get all read models in the workflow with their field definitions.
 
-### create_read_model
+### create_read_mode
 Define a new read model/query. Name with retrieval prefixes.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `name` — Read model name (e.g., "GetOrderDetails", "ListActiveProducts", "SearchCustomers")
 - `entityId` — The source entity this query reads from (optional but recommended)
-- `fields` — Array of field definitions:
-  - Use `isFilter: true` for fields that act as query filters/parameters
+- `fields` — Array of field definitions representing the full query contract (both inputs and outputs):
+  - `name` — Field name in camelCase
+  - `isFilter` — Set true for query parameters/filters, omit for returned data fields
+  - `relatedEntityId` — ID of another entity to express a relationship
+  - `fields` — Nested field names from the related entity (for reference fields with relatedEntityId)
 
-### update_read_model
+### update_read_mode
 Modify a read model — rename, change source entity, or modify fields.
 
 - `workflowId`, `projectId`, `readModelId` — Identifies the read model
 - `name`, `entityId` — Updated values (optional)
 - `addFields`, `updateFields`, `removeFields` — Field modifications
 
-### delete_read_model
+### delete_read_mode
 Remove a read model. Also removes card references on events.
 
 - `workflowId`, `projectId`, `readModelId` — Identifies the read model
@@ -247,11 +254,11 @@ Remove a read model. Also removes card references on events.
 Cards attach domain model elements and requirements to events. They are the bridge between
 the process flow (events) and the domain model (entities, commands, read models).
 
-### list_card_types
+### list_card_type
 Get the available card type definitions for a workflow. Each card type has an ID, name, and
 role. Call this before creating cards to get the correct `cardTypeId` values.
 
-Common card types:
+Common card types
 - **Command** — Links a command to an event
 - **AggregateRoot** — Links an entity to an event
 - **ReadModel** — Links a read model to an event (requires cardinality)

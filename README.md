@@ -65,6 +65,26 @@ Get your API token from the Qlerify UI.
 
 Teaches AI agents how to effectively use Qlerify's MCP server. Contains the following skills:
 
+#### `workflow-creation`
+
+Guides AI agents through building complete Qlerify workflows from scratch — lanes, groups, domain events, entities,
+commands, read models, cards, and bounded contexts. Includes a full tool reference and a worked e-commerce example.
+
+**Triggers:**
+
+- "create a workflow"
+- "build a domain model"
+- "set up domain events"
+- "add commands and read models to workflow"
+- Any request involving building a Qlerify workflow or adding structural elements
+
+**What it does:**
+
+1. Follows a 10-step creation sequence (lanes → groups → events → entities → commands → read models → cards → bounded
+   contexts)
+2. Provides best practices for naming, field modeling, and entity relationships
+3. Supports nested fields on commands and read models for related entity references
+
 #### `sync`
 
 Syncs your codebase's domain model with Qlerify. Detects entities, commands, and read models in your code and ensures
@@ -105,10 +125,12 @@ standard MCP tools for large data.
 
 ```bash
 # Invoke skills directly
+/mcp-companion:workflow-creation
 /mcp-companion:sync
 /mcp-companion:download
 
 # Or just ask naturally - skills trigger automatically
+> create a workflow for an e-commerce order process
 > sync my domain model with Qlerify
 > download the Cart Microservice workflow to workflow.json
 > save the swagger spec for my workflow to api.yaml

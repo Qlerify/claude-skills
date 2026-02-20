@@ -126,10 +126,11 @@ create_entity(
   workflowId: "wf-1", projectId: "proj-1",
   name: "Order",
   fields: [
-    { name: "id", dataType: "string", exampleData: ["ord-001", "ord-002", "ord-003"], isRequired: true, primaryKey: true },
+    { name: "id", dataType: "string", exampleData: ["ord-001", "ord-002", "ord-003"], isRequired: true },
     { name: "customerId", dataType: "string", exampleData: ["cust-10", "cust-22", "cust-07"], isRequired: true },
     { name: "status", dataType: "string", exampleData: ["pending", "confirmed", "shipped"], isRequired: true },
     { name: "totalAmount", dataType: "number", exampleData: ["59.99", "124.50", "9.99"], isRequired: true },
+    { name: "orderItems", dataType: "object", exampleData: ["ci-001, ci-002", "ci-003", "ci-004, ci-005"], relatedEntityId: "ent-order-item", cardinality: "one-to-many" },
     { name: "createdAt", dataType: "string", exampleData: ["2026-01-15T10:00:00Z", "2026-01-16T14:30:00Z", "2026-01-17T09:15:00Z"], isRequired: true }
   ]
 )
@@ -137,16 +138,15 @@ create_entity(
 
 create_entity(
   workflowId: "wf-1", projectId: "proj-1",
-  name: "CartItem",
+  name: "OrderItem",
   fields: [
-    { name: "id", dataType: "string", exampleData: ["ci-001", "ci-002", "ci-003"], isRequired: true, primaryKey: true },
+    { name: "id", dataType: "string", exampleData: ["ci-001", "ci-002", "ci-003"], isRequired: true },
     { name: "productName", dataType: "string", exampleData: ["Wireless Mouse", "USB-C Cable", "Laptop Stand"], isRequired: true },
     { name: "quantity", dataType: "number", exampleData: ["1", "3", "2"], isRequired: true },
-    { name: "unitPrice", dataType: "number", exampleData: ["29.99", "8.50", "45.00"], isRequired: true },
-    { name: "orderId", dataType: "string", exampleData: ["ord-001", "ord-001", "ord-002"], isRequired: true, relatedEntityId: "ent-order", cardinality: "one-to-many" }
+    { name: "unitPrice", dataType: "number", exampleData: ["29.99", "8.50", "45.00"], isRequired: true }
   ]
 )
-→ { entityId: "ent-cart-item" }
+→ { entityId: "ent-order-item" }
 ```
 
 ### Step 6 — Create commands
@@ -156,8 +156,9 @@ create_command(
   workflowId: "wf-1", projectId: "proj-1",
   name: "AddItemToCart",
   fields: [
-    { name: "productId", dataType: "string", exampleData: ["prod-101", "prod-202", "prod-303"], isRequired: true },
-    { name: "quantity", dataType: "number", exampleData: ["1", "2", "5"], isRequired: true }
+    { name: "orderId", isRequired: true, hideInForm: true },
+    { name: "orderItems", relatedEntityId: "ent-order-item", cardinality: "one-to-one",
+      fields: [{ name: "productName" }, { name: "quantity" }, { name: "unitPrice" }] }
   ]
 )
 → { commandId: "cmd-add" }
@@ -166,9 +167,9 @@ create_command(
   workflowId: "wf-1", projectId: "proj-1",
   name: "PlaceOrder",
   fields: [
-    { name: "cartId", dataType: "string", exampleData: ["cart-01", "cart-02", "cart-03"], isRequired: true },
-    { name: "shippingAddress", dataType: "string", exampleData: ["123 Main St", "456 Oak Ave", "789 Pine Rd"], isRequired: true },
-    { name: "paymentMethod", dataType: "string", exampleData: ["credit_card", "paypal", "bank_transfer"], isRequired: true }
+    { name: "customerId", isRequired: true },
+    { name: "orderItems", relatedEntityId: "ent-order-item", cardinality: "one-to-many",
+      fields: [{ name: "productName" }, { name: "quantity" }, { name: "unitPrice" }] }
   ]
 )
 → { commandId: "cmd-place" }
@@ -177,9 +178,9 @@ create_command(
   workflowId: "wf-1", projectId: "proj-1",
   name: "ShipOrder",
   fields: [
-    { name: "orderId", dataType: "string", exampleData: ["ord-001", "ord-002", "ord-003"], isRequired: true },
-    { name: "trackingNumber", dataType: "string", exampleData: ["TRK-1234", "TRK-5678", "TRK-9012"], isRequired: true },
-    { name: "carrier", dataType: "string", exampleData: ["FedEx", "UPS", "DHL"], isRequired: true }
+    { name: "orderId", isRequired: true },
+    { name: "trackingNumber", isRequired: true },
+    { name: "carrier", isRequired: true }
   ]
 )
 → { commandId: "cmd-ship" }
@@ -193,7 +194,13 @@ create_read_model(
   name: "GetOrderDetails",
   entityId: "ent-order",
   fields: [
-    { name: "orderId", dataType: "string", exampleData: ["ord-001", "ord-002", "ord-003"], isRequired: true, isFilter: true }
+    { name: "orderId", isFilter: true },
+    { name: "customerId" },
+    { name: "status" },
+    { name: "totalAmount" },
+    { name: "orderItems", relatedEntityId: "ent-order-item",
+      fields: [{ name: "productName" }, { name: "quantity" }, { name: "unitPrice" }] },
+    { name: "createdAt" }
   ]
 )
 → { readModelId: "rm-details" }
@@ -203,8 +210,10 @@ create_read_model(
   name: "ListCustomerOrders",
   entityId: "ent-order",
   fields: [
-    { name: "customerId", dataType: "string", exampleData: ["cust-10", "cust-22", "cust-07"], isRequired: true, isFilter: true },
-    { name: "status", dataType: "string", exampleData: ["pending", "confirmed", "shipped"], isFilter: true }
+    { name: "customerId", isFilter: true },
+    { name: "status", isFilter: true },
+    { name: "totalAmount" },
+    { name: "createdAt" }
   ]
 )
 → { readModelId: "rm-list" }
@@ -236,7 +245,7 @@ Link domain model elements to their corresponding events:
 ```
 # "Item Added to Cart" ← AddItemToCart command + CartItem aggregate
 create_card(workflowId: "wf-1", projectId: "proj-1", eventId: "evt-1", cardTypeId: "ct-cmd", schemaId: "cmd-add")
-create_card(workflowId: "wf-1", projectId: "proj-1", eventId: "evt-1", cardTypeId: "ct-agg", schemaId: "ent-cart-item")
+create_card(workflowId: "wf-1", projectId: "proj-1", eventId: "evt-1", cardTypeId: "ct-agg", schemaId: "ent-order-item")
 
 # "Order Placed" ← PlaceOrder command + Order aggregate
 create_card(workflowId: "wf-1", projectId: "proj-1", eventId: "evt-2", cardTypeId: "ct-cmd", schemaId: "cmd-place")
@@ -262,7 +271,7 @@ create_bounded_context(workflowId: "wf-1", projectId: "proj-1", name: "Order Man
 
 # Assign entities to the context
 update_entity(workflowId: "wf-1", projectId: "proj-1", entityId: "ent-order", boundedContextId: "bc-orders")
-update_entity(workflowId: "wf-1", projectId: "proj-1", entityId: "ent-cart-item", boundedContextId: "bc-orders")
+update_entity(workflowId: "wf-1", projectId: "proj-1", entityId: "ent-order-item", boundedContextId: "bc-orders")
 ```
 
 ---
@@ -274,7 +283,7 @@ The workflow now has:
 - 3 lanes (Customer, Order Service, Payment Gateway)
 - 3 groups (Browse & Cart, Checkout, Fulfillment)
 - 6 domain events with a decision gateway for payment
-- 2 entities (Order, CartItem) with typed fields and references
+- 2 entities (Order, OrderItem) with typed fields and relationships
 - 3 commands (AddItemToCart, PlaceOrder, ShipOrder)
 - 2 read models (GetOrderDetails, ListCustomerOrders)
 - 7 cards linking domain model to events

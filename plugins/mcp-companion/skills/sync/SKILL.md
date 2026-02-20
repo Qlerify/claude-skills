@@ -59,28 +59,29 @@ Summarize:
 
 ## Field type mapping
 
-| Code Type                                     | Qlerify Type                        |
-|-----------------------------------------------|-------------------------------------|
-| `string`, `varchar`, `text`, `char`           | `string`                            |
-| `number`, `int`, `float`, `decimal`, `bigint` | `number`                            |
-| `boolean`, `bool`                             | `boolean`                           |
-| Foreign key, relation, `@relation`            | `reference` (set `relatedEntityId`) |
-| Nested object, JSON, `jsonb`                  | `object`                            |
+| Code Type                                     | Qlerify Type                          |
+|-----------------------------------------------|---------------------------------------|
+| `string`, `varchar`, `text`, `char`           | `string`                              |
+| `number`, `int`, `float`, `decimal`, `bigint` | `number`                              |
+| `boolean`, `bool`                             | `boolean`                             |
+| Foreign key, relation, `@relation`            | Set `relatedEntityId` + `cardinality` |
+| Nested object, JSON, `jsonb`                  | `object`                              |
 
 ## Guidelines
 
 When creating/updating entities:
 - Include 3 realistic example data values per field
-- Mark primary keys with `primaryKey: true`
 - Set `isRequired: true` for non-nullable fields
-- Use `relatedEntityId` for foreign keys
-- Set `cardinality` to `one-to-one` or `one-to-many` for references
+- Use `relatedEntityId` and `cardinality` to express entity relationships from the owning entity's perspective
 
 When creating commands:
 - Name with verbs: Create, Update, Delete, Submit, Cancel
+- Fields should correspond to fields on the aggregate root entity they modify
 - Mark auto-generated fields with `hideInForm: true`
+- Use nested `fields` with `relatedEntityId` to reference related entities
 
 When creating read models:
 - Name with Get/List/Search prefixes
 - Link to entity via `entityId`
-- Mark filters with `isFilter: true`
+- Fields represent both inputs and outputs: set `isFilter: true` for query parameters, omit for returned data fields
+- Use nested `fields` with `relatedEntityId` for return fields that reference other entities
