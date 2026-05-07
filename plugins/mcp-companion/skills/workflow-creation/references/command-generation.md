@@ -136,11 +136,11 @@ Examples: `cartItem`, `shippingAddress`, `appliedPromotion`
 
 ## MCP Mapping
 
-When using `create_command` or `update_command`:
+When using `create_commands` or `update_commands`:
 
 - Category 1 fields → `{ name: "quantity" }`
 - Category 2 fields → `{ name: "productId" }`
 - Category 3 fields → `{ name: "customer", relatedEntity: "#/schemas/entities/Customer", cardinality: "one-to-one" }` (no nested fields)
 - Category 4 fields → `{ name: "cartItem", relatedEntity: "#/schemas/entities/CartItem", cardinality: "one-to-many", fields: [...] }`
 
-The `relatedEntity` $ref is needed in MCP because there's no post-hoc name matching like the internal flow. The entity must already exist (created empty in Step 5).
+The `relatedEntity` $ref is needed in MCP because there's no post-hoc name matching like the internal flow. The entity must already exist (created empty in Step 4).
