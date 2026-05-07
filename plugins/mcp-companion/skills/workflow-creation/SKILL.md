@@ -255,7 +255,7 @@ update_entity(
 - **Always include `description`** — a concise one-sentence explanation in business language
 - Include `dataType`: `string`, `number`, `boolean`, `object`
 - Mark fields essential for creation with `isRequired: true`
-- Fields populated only during specific lifecycle transitions (cancel, archive, complete) should NOT be required
+- Fields populated only during specific lifecycle transitions (cancel, archive, complete) should NOT be set as required fields
 
 ### Phase 4: Validation Loop
 
@@ -282,16 +282,6 @@ commands/read models and their aggregate root entities.
 - **Denormalized fields on commands** (e.g., `guestEmail` when `guestId` already exists) → Replace with flat ID ref and let the service look up related data internally
 - **Typos or inconsistent naming** between command/read model and entity fields → Rename for consistency
 
-**Common legitimate patterns to leave as-is:**
-
-- **Calculated/derived fields on read models** (e.g., `total`, `subtotal`, `taxTotal`, `shippingTotal` on a "Get Cart Totals" query) — these are computed at runtime from entity fields, not stored on the entity. `FIELD_NOT_IN_ENTITY` warnings on these are expected and correct
-- **Aggregated fields on read models** (e.g., `orderCount`, `averageRating`, `totalSpent`) — same principle: computed from queries over other data
-- **Cross-entity filter parameters** on read models (e.g., `checkInDate` on a Hotel search, `minPrice` on a Product search) — filter fields for search/query parameters don't need to exist on the entity
-- **Formatted/presentation fields** on read models (e.g., `fullName` when entity has `firstName` + `lastName`, `displayAddress` when entity has separate address components) — these are projections for display, not storage
-- **Status/computed flags on read models** (e.g., `isOverdue`, `isExpired`) — derived from date comparisons at query time
-
-**How to judge:** Ask yourself "In a real application, would this field be **stored** on the database table for this entity, or would it be **calculated on the fly** when the query runs?" If the answer is "calculated at runtime" or "joined from another table at query time", the field is a legitimate read model field and the warning can be ignored.
-
 **Important:** Do not consider the workflow complete until every remaining issue has been consciously reviewed and either fixed or judged as a legitimate pattern.
 
 ### Phase 5: Polish (optional)
@@ -302,7 +292,7 @@ These steps are cosmetic and can be skipped if not needed.
 
 > **Do NOT create groups as part of a default workflow generation.** Skip this step entirely unless the user explicitly asks for them — e.g., "group the events into phases", "add groups for the checkout/fulfillment stages", "organize events into stages". A newly generated workflow should have zero groups by default.
 
-Groups organize events into visual vertical phases on the diagram. When the user asks for them:
+Groups split the workflow into phases seen on the diagram with labels spread out horizontally from left to right at the top of the diagram and vertical dividers splitting the flow into phases. When the user asks for them:
 
 1. Call `create_group` for each phase, in the order they appear on the timeline.
 2. Assign events to groups using `update_domain_event` with the `group` parameter. Only set `group` on the **first event** that starts a new group — subsequent events in the same group inherit it automatically based on their position on the timeline.
@@ -324,28 +314,27 @@ update_domain_event(domainEvent: "#/domainEvents/OrderPlaced", color: "blue")
 
 ## Constraints and Rules
 
-- **One Aggregate Root card per event** — An event can only have one entity linked as aggregate root
+- **Every domain event should have a command and an aggregate root** — No naked events. Domain event schemas are optional and only expected for Event Sourcing workflows (see Step 9)
 - **One Command card per event** — An event can only have one command
+- **One Aggregate Root card per event** — An event can only have one entity linked as aggregate root
 - **One Domain Event card per event** — An event can only have one domain event schema (when one is created)
-- **Every event should have an aggregate root and a command** — No naked events. Domain event schemas are optional and only expected for Event Sourcing workflows (see Step 9)
 - **Read Model cards require cardinality** — Always specify "one-to-one" or "one-to-many"
 - **Lanes cannot be deleted if they contain events** — Move or delete events first
-- **Domain events require a lane** — Every event must be assigned to a lane
+- **Domain events require a lane** — Every event must be assigned to an actor
 - **Chain events via follows** — Use "start" for root events, otherwise reference the parent via `$ref` path
 - **Bounded contexts must exist before referencing them** — Create BCs before assigning entities to them
 
 ## `relatedEntity` Usage Summary
 
-
-| Context                       | Use `relatedEntity`?                          | Example                                     |
-| ----------------------------- | --------------------------------------------- | ------------------------------------------- |
-| Command: simple ID lookup     | **NO** — use flat string field                | `bookingId: "bk-001"`                       |
-| Command: embedded collection  | **YES** — multiple fields needed              | `orderItems: [{ productName, qty, price }]` |
-| Read Model: composed response | **YES** — nested joined data                  | `guest: { firstName, lastName, email }`     |
-| Read Model: filter parameter  | **NO** — use flat field with `isFilter: true` | `checkInDate` (isFilter)                    |
-| Domain Event: embedded data   | **YES** — nested event payload data           | `orderItems: [{ productId, qty, price }]`   |
-| Domain Event: ID reference    | **NO** — use flat field                       | `orderId`, `customerId`                     |
-| Entity: relationship          | **YES** — defines data model links            | `order → OrderItem (one-to-many)`           |
+| Context                               | Use `relatedEntity`?                          | Example                                     |
+| ------------------------------------- | --------------------------------------------- | ------------------------------------------- |
+| Command: primitive type               | **NO** — use flat string field                | `bookingId: "bk-001"`                       |
+| Command: nested structure             | **YES** — multiple fields needed              | `orderItems: [{ productName, qty, price }]` |
+| Read Model: nested structure          | **YES** — nested joined data                  | `guest: { firstName, lastName, email }`     |
+| Read Model: filter parameter          | **NO** — use flat field with `isFilter: true` | `checkInDate` (isFilter)                    |
+| Domain Event: nested structure        | **YES** — nested event payload data           | `orderItems: [{ productId, qty, price }]`   |
+| Domain Event: ID reference            | **NO** — use flat field                       | `orderId`, `customerId`                     |
+| Entity: related entity                | **YES** — defines data model links            | `order → OrderItem (one-to-many)`           |
 
 
 **Naming rule:** If using `relatedEntity`, name the field as the entity (`guest`, `hotel`, `orderItems`).
@@ -356,18 +345,18 @@ with `relatedEntity`.
 
 ### CRUD Service
 
-Lanes: User, Automation
-Flow: User action event → Automation processing event per operation
+- Lanes: User, Automation
+- Flow: User action event → Automation processing event per operation
 
 ### Approval Pipeline
 
-Lanes: Requester, Approver, Automation
-Flow: Request submitted → Review pending → Approved/Rejected gateway → Executed
+- Lanes: Requester, Approver, Automation
+- Flow: Request submitted → Review pending → Approved/Rejected gateway → Executed
 
 ### Event-Driven Saga
 
-Lanes: Customer, Admin, Automation
-Flow: Customer/Admin actions trigger events, Automation handles cross-service coordination via decision gateways
+- Lanes: Customer, Admin, Automation
+- Flow: Customer/Admin actions trigger events, Automation handles cross-service coordination via decision gateways
 
 ## Tips for Well-Structured Workflows
 
