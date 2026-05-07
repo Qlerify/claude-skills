@@ -45,9 +45,9 @@ Include ALL command attributes without exception. Do NOT filter or omit:
 
 ### Handling Nested Command Fields
 
-When a command has a field with nested sub-fields (e.g., `shippingAddress` containing street, city, postalCode, country), create a corresponding entity or value object with a matching name:
+When a command ("Create Order" operating on the aggregate root "Order") has a field with nested sub-fields (e.g., `shippingAddress` containing street, city, postalCode, country), create a corresponding attribute on the Order entity, and create an entity or value object with a matching name:
 
-- Command field `shippingAddress` → Entity/Value Object "Shipping Address"
+- Command field `shippingAddress` → We need an Entity or Value Object named "Shipping Address" or "Address"
 - Include ALL the nested sub-fields as attributes
 
 ### Aggregate Root References to Nested Structures
