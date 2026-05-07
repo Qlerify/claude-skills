@@ -83,32 +83,22 @@ Follow these steps in order. Each step depends on the previous one.
 For an existing workflow, call `list_workflows` to find it, then `get_workflow` to understand
 its current state. For a new workflow, call `create_workflow` with a descriptive name.
 
-**Step 2 — Create lanes**
-
-Every domain event must belong to a lane.
-
-Call `create_lane` for each actor. Aim for 2-4 lanes.
-
-**Lane design rules:**
-- See the section "Lane Tools" in `references/tools.md`.
-- Ask: "Is this a person who performs an action, or a system that runs automatically?" If the latter → Automation
-
-**Common patterns:**
-
-- E-commerce: Customer, Warehouse Staff, Automation
-- Hotel Booking: Guest, Hotel Staff, Automation
-- HR Onboarding: Candidate, HR Manager, Automation
-
 ### Phase 2: Event Flow
 
-**Step 3 — Create domain events** *(see `references/event-generation.md` for naming and chronology rules)*
+**Step 2 — Create domain events** *(see `references/event-generation.md` for naming and chronology rules)*
 
 Build the event flow by chaining calls to `create_domain_event`. Each event needs:
 
 - `description` — Aggregate Name + Space + Past Tense Verb
-- `lane` — The lane name (e.g., "Customer")
+- `lane` — The actor or system the event belongs to (e.g., "Customer", "Automation"). Auto-created on the fly if no lane with that name exists yet — no separate setup step. Pass exactly the same name across events that share a lane to avoid duplicate auto-created lanes. See "Lane Tools" in `references/tools.md` for actor naming rules.
 - `follows` — A `$ref` path to the preceding event, or `"start"` for flow entry points
 - `type` — Either `domainEvent` (regular event) or `decision` (decision diamond)
+
+**Common lane patterns:**
+
+- E-commerce: Customer, Warehouse Staff, Automation
+- Hotel Booking: Guest, Hotel Staff, Automation
+- HR Onboarding: Candidate, HR Manager, Automation
 
 Optional parameters:
 
@@ -120,7 +110,7 @@ Do NOT set `group` either — groups are a cosmetic polish step handled later (P
 
 ### Phase 3: Domain Model
 
-**Step 4 — Create bounded contexts**
+**Step 3 — Create bounded contexts**
 
 Create bounded contexts BEFORE entities, so entities can be assigned during creation. Call
 `create_bounded_context` for each logical boundary.
@@ -136,39 +126,37 @@ Create bounded contexts BEFORE entities, so entities can be assigned during crea
 - Hotel Booking (6 entities): 1 BC — "Hotel Booking"
 - Large E-commerce Platform (20+ entities): 4-5 BCs — "Product Catalog", "Order Management", "Inventory", "Customer Management", "Payments"
 
-**Step 5 — Generate entity and value object names without attributes**
+**Step 4 — Generate entity and value object names, and link aggregate roots to events**
 
-Create entities and value objects with just their name and bounded context — **no fields yet**. This establishes
-`$ref` paths so commands, read models, and domain event schemas can reference them. Although entities and VOs have separate paths in the schema, they are created with the same `create_entity` tool; the presence of an `id` field is the differentiator.
+Create entities and value objects with just their name and bounded context, and in the same call link each entity to the events it is the aggregate root for. This establishes `$ref` paths so commands, read models, and domain event schemas can reference them. Classification is determined by the presence of an `id` field — entities have one, value objects do not. Setting this at creation time avoids a follow-up `update_entities` call to convert misclassified value objects.
 
-```
-create_entity(workflowId: "wf-1", name: "Order", boundedContext: "Order Management")
--> { $ref: "#/schemas/entities/Order" }
+**Aggregate roots** are linked via `aggregateRootFor` on each entity. The domain event name often hints at its aggregate root — "Order Created" indicates the Order entity. Each event can have only one aggregate root, and value objects cannot be aggregate roots. **Every event must have an aggregate root before proceeding.**
 
-create_entity(workflowId: "wf-1", name: "Order Item", boundedContext: "Order Management")
--> { $ref: "#/schemas/entities/OrderItem" }
-
-create_entity(workflowId: "wf-1", name: "Address", boundedContext: "Order Management")
--> { $ref: "#/schemas/valueObjects/Address" }
-```
-
-Identify ALL entities and value objects the domain needs — aggregate root entities, related or associated entities,
-and value objects. Create them all now so their `$ref` paths are available for subsequent steps.
-
-**Step 6 — Link aggregate roots to events**
-
-Now that all entities exist, although we have not created commands yet, identify the entities that are likely aggregate roots for the commands / domain events. The domain event often contains a hint. "Order Created" indicates that the Order entity is likely the aggregate root. Link each domain event to its aggregate root entity:
+Use `create_entities` to create the schemas. It is a bulk tool: each call accepts an array of entities and value objects, creates them, and links the aggregate roots in one atomic workflow write — so prefer batching when several can be created together.
 
 ```
-update_domain_event(domainEvent: "#/domainEvents/OrderPlaced", aggregateRoot: "#/schemas/entities/Order")
+create_entities(workflowId: "wf-1", entities: [
+  {
+    name: "Order",
+    boundedContext: "Order Management",
+    fields: [{ name: "id" }],
+    aggregateRootFor: ["#/domainEvents/OrderPlaced", "#/domainEvents/OrderCancelled"]
+  },
+  { name: "Order Item", boundedContext: "Order Management", fields: [{ name: "id" }] },
+  { name: "Address", boundedContext: "Order Management" }
+])
+-> Order, Order Item are entities ($ref under #/schemas/entities/...)
+-> Address is a value object ($ref under #/schemas/valueObjects/...)
+-> Order is set as aggregate root for OrderPlaced and OrderCancelled
 ```
 
-**Every event must be associated with an aggregate root before proceeding.**
+Identify ALL entities and value objects the domain needs — aggregate root entities, related or associated entities, and value objects. Use DDD judgment to decide which get the `id` field: things with their own lifecycle and identity are entities; things defined purely by their attributes (Money, Address, DateRange) are value objects.
 
-**Step 7 — Create commands on events** *(see `references/command-generation.md` for detailed field rules)*
+> If you later need to reassign an aggregate root for a single event, use `update_domain_event(domainEvent: "...", aggregateRoot: "...")`. For initial workflow creation, always set it via `aggregateRootFor` on `create_entities`.
 
-Call `create_command` for each state-changing operation. Commands and domain events have a one-to-one relationship. Associate a command with an event via the required `domainEvent` parameter (a `$ref` path like `#/domainEvents/OrderPlaced`).
-A command is attached to a domain event using a card on that event.
+**Step 5 — Create commands on events** *(see `references/command-generation.md` for detailed field rules)*
+
+Use `create_commands` to create the commands. It is a bulk tool: each call accepts an array of commands and attaches them to their events in one atomic workflow write — so prefer batching when several commands can be created together. Commands and domain events have a one-to-one relationship — each command in the batch must target a different event. Associate a command with an event via the required `domainEvent` parameter (a `$ref` path like `#/domainEvents/OrderPlaced`).
 
 - Name commands using action verbs and spaces (e.g., "Create Order", "Cancel Subscription")
 - Use `relatedEntity` when an attribute holds related entities or value objects
@@ -185,9 +173,9 @@ are no events without a command card. Events without commands represent gaps in 
 
 - **Search/filter parameters do NOT belong on commands** — they belong on Read Models with `isFilter: true`
 
-**Step 8 — Create read models on events** *(see `references/read-model-generation.md` for detailed field rules)*
+**Step 6 — Create read models on events** *(see `references/read-model-generation.md` for detailed field rules)*
 
-Call `create_read_model` for each query / view / projection. Each read model is associated with a domain event using the required `domainEvent` parameter. The read model represents the input data needed by the actor BEFORE triggering the Command that in turn triggers the event.
+Use `create_read_models` to create the read models. It is a bulk tool: each call accepts an array of read models and attaches them to their events in one atomic workflow write — so prefer batching when several can be created together. Each read model is linked to an event via the required `domainEvent` parameter. The read model represents the input data needed by the actor BEFORE triggering the Command that in turn triggers the event.
 
 - Name with Get/List/Search prefixes and spaces (e.g., "Get Order Details", "List Customer Orders")
 - Link to the source entity via `entity` ($ref path like `#/schemas/entities/Order`)
@@ -195,10 +183,9 @@ Call `create_read_model` for each query / view / projection. Each read model is 
 **Reuse read models across events when it makes sense.**
 
 Multiple events in the same workflow often need the same query — for example, several events along an Order's lifecycle all need "Get Order
-Details". Instead of creating a separate near-duplicate read model per event, just call `create_read_model` again with the **same read model name** on
-the new domain event. The backend will merge any new fields into that same read model schema. Judge reuse case-by-case: if a new event genuinely needs the same data shape and the same queried entity as an existing one, reuse it (same name); if the shape or entity differs, pick a different name and create a distinct read model.
+Details". Instead of creating a separate near-duplicate read model per event, include another entry in the `create_read_models` array with the **same `name`** on the new event. The backend recognizes the shared name, links each event to the same underlying read model, and merges any new fields you passed into it. Judge reuse case-by-case: if a new event genuinely needs the same data shape and the same queried entity as an existing one, reuse the same name; if the shape or entity differs, pick a different name and create a distinct read model.
 
-**Step 9 — Create domain event schemas on events (optional)** *(see `references/domain-event-generation.md` for detailed field rules)*
+**Step 7 — Create domain event schemas on events (optional)** *(see `references/domain-event-generation.md` for detailed field rules)*
 
 > **Skip this step by default.** Domain event schemas describe the payload published when an event fires, which is only meaningful in **Event Sourcing** architectures where events are the source of truth. Only perform this step if:
 >
@@ -207,14 +194,13 @@ the new domain event. The backend will merge any new fields into that same read 
 >
 > For regular CRUD/state-based applications, leave events without schemas — the workflow is complete without them. If unsure, ask the user before creating schemas.
 
-Call `create_domain_event_schema` for each event to define the data payload published when
-the event occurs. Each schema is automatically attached to an event via the required `domainEvent`
-parameter. This auto-creates the Domain Event card.
+Use `create_domain_event_schemas` to create the schemas. It is a bulk tool: each call accepts an array of schemas and attaches them to their events in one atomic workflow write — so prefer batching when several can be created together. Each schema is linked to an event via the required `domainEvent` parameter.
 
 - Name matching the event (e.g., "Order Created", "Payment Processed")
 - Link to the aggregate root entity via `entity` ($ref path like `#/schemas/entities/Order`)
 - Include fields that capture the essential facts about the state change
-- Use `relatedEntity` on nested fields pointing to the empty entities created in Step 5
+- Use `relatedEntity` on nested fields pointing to the empty entities created in Step 4
+- Each schema targets a different event — an event can only have one domain event schema
 
 **Domain event schema field rules (event payload):**
 
@@ -227,24 +213,24 @@ happened, not the full entity state:
 - Keep it focused — usually 3 to 8 fields are sufficient
 - Field names should be consistent with command and entity field names
 
-**Step 10 — Update entities with full fields** *(see `references/entity-generation.md` for detailed derivation rules)*
+**Step 8 — Update entities with full fields** *(see `references/entity-generation.md` for detailed derivation rules)*
 
-Now that all commands and read models exist (plus any domain event schemas, if Step 9 was performed),
-update each entity with its real fields. At this point you have full visibility into every schema
-that references each entity, so you can derive the correct set of fields.
+Now that all commands and read models exist (plus any domain event schemas, if Step 7 was performed), update each entity with its real fields. At this point you have full visibility into every schema that references each entity, so you can derive the correct set of fields.
+
+Use `update_entities` to apply the updates. It is a bulk tool: each call accepts an array of entity updates and applies them atomically in one workflow write, so prefer batching when several entities can be updated together. Entities created in Step 4 already have an `id` field, so use `addFields` to layer on the rest.
 
 ```
-update_entity(
-  workflowId: "wf-1",
-  entity: "#/schemas/entities/Order",
-  fields: [
-    { name: "id", dataType: "string", description: "Unique identifier of the order", exampleData: ["ord-001", "ord-002", "ord-003"], isRequired: true },
-    { name: "customerId", dataType: "string", description: "Customer who placed the order", exampleData: ["cust-10", "cust-22", "cust-07"], isRequired: true },
-    { name: "status", dataType: "string", description: "Current fulfillment status", exampleData: ["pending", "confirmed", "shipped"], isRequired: true },
-    { name: "orderItems", dataType: "object", description: "Line items in the order", relatedEntity: "#/schemas/entities/OrderItem", cardinality: "one-to-many", exampleData: ["Object", "Object", "Object"] },
-    { name: "createdAt", dataType: "string", description: "Timestamp when the order was placed", exampleData: ["2026-01-15T10:00:00Z", "2026-01-16T14:30:00Z", "2026-01-17T09:15:00Z"], isRequired: true }
-  ]
-)
+update_entities(workflowId: "wf-1", entities: [
+  {
+    entity: "#/schemas/entities/Order",
+    addFields: [
+      { name: "customerId", dataType: "string", description: "Customer who placed the order", exampleData: ["cust-10", "cust-22", "cust-07"], isRequired: true },
+      { name: "status", dataType: "string", description: "Current fulfillment status", exampleData: ["pending", "confirmed", "shipped"], isRequired: true },
+      { name: "orderItems", dataType: "object", description: "Line items in the order", relatedEntity: "#/schemas/entities/OrderItem", cardinality: "one-to-many", exampleData: ["Object", "Object", "Object"] },
+      { name: "createdAt", dataType: "string", description: "Timestamp when the order was placed", exampleData: ["2026-01-15T10:00:00Z", "2026-01-16T14:30:00Z", "2026-01-17T09:15:00Z"], isRequired: true }
+    ]
+  }
+])
 ```
 
 **Entity field design rules:**
@@ -259,7 +245,7 @@ update_entity(
 
 ### Phase 4: Validation Loop
 
-**Step 11 — Validate and fix the domain model**
+**Step 9 — Validate and fix the domain model**
 
 Run `validate_domain_model` to check for structural issues. This catches field mismatches between
 commands/read models and their aggregate root entities.
@@ -277,8 +263,8 @@ commands/read models and their aggregate root entities.
 
 **Common real problems to fix:**
 
-- **Command field not on entity when it should be stored** → Add the missing field to the entity via `update_entity`, or remove the field from the command via `update_command`
-- **Missing entity relationship** that the business domain requires → Add `relatedEntity` field to entity via `update_entity`
+- **Command field not on entity when it should be stored** → Add the missing field to the entity via `update_entities`, or remove the field from the command via `update_commands`
+- **Missing entity relationship** that the business domain requires → Add `relatedEntity` field to entity via `update_entities`
 - **Denormalized fields on commands** (e.g., `guestEmail` when `guestId` already exists) → Replace with flat ID ref and let the service look up related data internally
 - **Typos or inconsistent naming** between command/read model and entity fields → Rename for consistency
 
@@ -288,7 +274,7 @@ commands/read models and their aggregate root entities.
 
 These steps are cosmetic and can be skipped if not needed.
 
-**Step 12 — Create groups (optional, only on explicit user request)**
+**Step 10 — Create groups (optional, only on explicit user request)**
 
 > **Do NOT create groups as part of a default workflow generation.** Skip this step entirely unless the user explicitly asks for them — e.g., "group the events into phases", "add groups for the checkout/fulfillment stages", "organize events into stages". A newly generated workflow should have zero groups by default.
 
@@ -302,7 +288,7 @@ Common phase patterns (use these as inspiration only when the user asks):
 - E-commerce: "Browse & Cart", "Checkout", "Fulfillment"
 - Onboarding: "Registration", "Verification", "Setup", "Activation"
 
-**Step 13 — Set colors (optional, only on explicit user request)**
+**Step 11 — Set colors (optional, only on explicit user request)**
 
 > **Do NOT set colors as part of a default workflow generation.** Skip this step entirely unless the user explicitly asks for them — e.g., "color-code the events by lane", "make the automation events blue", "highlight the checkout events in green". A newly generated workflow should leave every event on its default peach color.
 
@@ -314,7 +300,7 @@ update_domain_event(domainEvent: "#/domainEvents/OrderPlaced", color: "blue")
 
 ## Constraints and Rules
 
-- **Every domain event should have a command and an aggregate root** — No naked events. Domain event schemas are optional and only expected for Event Sourcing workflows (see Step 9)
+- **Every domain event should have a command and an aggregate root** — No naked events. Domain event schemas are optional and only expected for Event Sourcing workflows (see Step 7)
 - **One Command card per event** — An event can only have one command
 - **One Aggregate Root card per event** — An event can only have one entity linked as aggregate root
 - **One Domain Event card per event** — An event can only have one domain event schema (when one is created)

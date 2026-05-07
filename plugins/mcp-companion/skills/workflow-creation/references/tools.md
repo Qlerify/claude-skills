@@ -54,7 +54,7 @@ Lanes are the horizontal swim lanes on the Event Storming board. Lanes represent
 
 ### create_lane
 
-Add a new swim lane to the workflow. Name it after the actor role or "Automation" for system actions.
+Add a new swim lane to the workflow. Name it after the actor role or "Automation" for system actions. Usually you don't need this tool when building a workflow from scratch — `create_domain_event` auto-creates a lane on the fly the first time you reference an unfamiliar lane name. Use `create_lane` only when you want to seed lanes ahead of any events.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `name` — The lane name (e.g., "Customer", "Hotel Staff", "Automation"). NOT service names like "Payment Service"
@@ -119,7 +119,7 @@ make up the process flow.
 - `workflowId`, `projectId` — Identifies the workflow
 - `description` — The event name (use past-tense: "Order Created", not "Create Order"). **Avoid special characters** (`?`, `!`, `&`, `#`) — they break `$ref` path resolution. Hyphens are removed and the next letter capitalized in `$ref` keys (e.g., "Check-in" → `CheckIn`).
 - `type` — Either `'domainEvent'` (regular event) or `'decision'`
-- `lane` — Name of the actor this event belongs to (required)
+- `lane` — Name of the actor this event belongs to (required). Auto-created on the fly if no lane with that name exists yet, so you don't need a separate `create_lane` call when seeding a new workflow. Pass exactly the same name across events that share a lane to avoid duplicates.
 - `follows` — A `$ref` path to the preceding event (e.g., `#/domainEvents/OrderPlaced`), or `"start"` for flow entry points. The new event is inserted after the parent in the flow sequence.
 - `group` — Optional. Sets a group boundary starting at this event. Only set on the **first** event of a new group. Do not set group on subsequent events in the same group.
 - `aggregateRoot` — Optional. `$ref` path to an entity (e.g., `#/schemas/entities/Order`). Links an entity as aggregate root for the command triggering this event. **Every command / event should have one** — if the entity doesn't exist yet, set it later via `update_domain_event` after creating entities.
@@ -155,32 +155,37 @@ deleted event's parent, preserving the flow.
 
 Entities are persistent domain objects. Value Objects are attribute-based types typically used within those entities as part of the domain model. Use `get_workflow` to see existing entities and value objects with their fields.
 
-### create_entity
+### create_entities
 
-Define a new domain entity or value object with typed fields. Each field needs a name, data type, and ideally
-example data to make the model concrete. Note: Value Objects are created with the same tool as entities but always without an id attribute. In the domain model, VOs have a separate path from entities based on the existence of an id field.
-
-- `workflowId` — Identifies the workflow
-- `name` — Entity or VO name (e.g., "Order", "Customer")
-- `boundedContext` — Optional. Name of the bounded context to assign this entity / VO to
-- `fields` — Optional. Array of field definitions:
-  - `name` — Field name in camelCase (entities must always have one attribute named exactly `id`; value objects must never have a field named `id`)
-  - `dataType` — One of: `string`, `number`, `boolean`, `object`
-  - `exampleData` — Array of 3 realistic example values
-  - `isRequired` — Whether the field is mandatory (true/false)
-  - `relatedEntity` — `$ref` path to another entity (e.g., `#/schemas/entities/OrderItem`)
-  - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
-
-### update_entity
-
-Modify an entity — rename it, add/update/remove fields, or change its bounded context assignment.
-Field operations are applied in order: remove -> update -> add.
+Define one or more domain entities or value objects in a single atomic workflow write. Pass an array; for a single entity, pass an array with one element. One bulk call avoids the version-conflict races that arise when creating entities in parallel. Note: Value Objects are created with the same tool as entities but always without an id attribute. In the domain model, VOs have a separate path from entities based on the existence of an id field.
 
 - `workflowId` — Identifies the workflow
-- `entity` — `$ref` path to the entity (e.g., `#/schemas/entities/Order`)
-- `name` — New name (optional)
-- `boundedContext` — Bounded context name to assign to (optional, empty string to clear)
-- `addFields`, `updateFields`, `removeFields` — Field modification arrays
+- `entities` — Array of entity / VO definitions, each with:
+  - `name` — Entity or VO name (e.g., "Order", "Customer")
+  - `boundedContext` — Optional. Name of the bounded context to assign this entity / VO to
+  - `aggregateRootFor` — Optional. Array of `$ref` paths to events this entity is the aggregate root for (e.g., `["#/domainEvents/OrderPlaced"]`). Only entities with an `id` field can be aggregate roots.
+  - `fields` — Optional. Array of field definitions:
+    - `name` — Field name in camelCase (entities must always have one attribute named exactly `id`; value objects must never have a field named `id`)
+    - `dataType` — One of: `string`, `number`, `boolean`, `object`
+    - `exampleData` — Array of 3 realistic example values
+    - `isRequired` — Whether the field is mandatory (true/false)
+    - `relatedEntity` — `$ref` path to another entity (e.g., `#/schemas/entities/OrderItem`)
+    - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
+
+The whole batch is atomic: if any entity fails validation (e.g. duplicate name), none are created.
+
+### update_entities
+
+Modify one or more entities in a single atomic workflow write — rename, add/update/remove fields, or change bounded context. Pass an array of entity updates; for a single entity, pass an array with one element. Field operations are applied per entity in order: remove → update → add.
+
+- `workflowId` — Identifies the workflow
+- `entities` — Array of entity updates, each with:
+  - `entity` — `$ref` path to the entity (e.g., `#/schemas/entities/Order`). Required.
+  - `name` — New name (optional)
+  - `boundedContext` — Bounded context name to assign to (optional, empty string to clear)
+  - `addFields`, `updateFields`, `removeFields` — Field modification arrays
+
+The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_entity
 
@@ -195,22 +200,21 @@ Remove an entity from the domain model.
 
 Commands represent state-changing operations — actions that modify data. They correspond to POST/PUT/DELETE API endpoints or write operations. Commands and domain events have a one-to-one relationship. Commands are created on domain events and attached by automatically creating a command card on that event. Use `get_workflow` to see existing commands.
 
-### create_command
+### create_commands
 
-Define a new command with input fields, attached to a specific domain event. Auto-creates
-a Command card on the event. Commands with their attributes represent the information an actor submits
-to perform a state-changing action on an aggregate.
+Define one or more commands in a single atomic workflow write. Pass an array of commands, each bound to a domain event; for a single command, pass an array with one element. Auto-creates a Command card on each event. Commands with their attributes represent the information an actor submits to perform a state-changing action on an aggregate. Each event can have only one command, so each command in the batch must target a different event.
 
 - `workflowId` — Identifies the workflow
-- `domainEvent` — `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`). Required.
-- `name` — Command name with verb prefix and spaces (e.g., "Create Order", "Cancel Subscription")
-- `fields` — Array of field definitions or command attributes:
-  - `name` — Field name in camelCase
-  - `isRequired` — Whether the field is required/mandatory
-  - `hideInForm` — Set true for auto-generated fields like IDs and timestamps
-  - `relatedEntity` — `$ref` path to a related entity. Use this for attributes implicitly typed as an object. Do NOT use this for primitive types. Do NOT use this for strings holding id references to entities or value objects in other bounded contexts.
-  - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
-  - `fields` — Nested field names from the related entity (only for fields with relatedEntity)
+- `commands` — Array of command definitions, each with:
+  - `domainEvent` — `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`). Required.
+  - `name` — Command name with verb prefix and spaces (e.g., "Create Order", "Cancel Subscription")
+  - `fields` — Array of field definitions or command attributes:
+    - `name` — Field name in camelCase
+    - `isRequired` — Whether the field is required/mandatory
+    - `hideInForm` — Set true for auto-generated fields like IDs and timestamps
+    - `relatedEntity` — `$ref` path to a related entity. Use this for attributes implicitly typed as an object. Do NOT use this for primitive types. Do NOT use this for strings holding id references to entities or value objects in other bounded contexts.
+    - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
+    - `fields` — Nested field names from the related entity (only for fields with relatedEntity)
 
 **Field design rules for commands:**
 
@@ -219,14 +223,17 @@ to perform a state-changing action on an aggregate.
 - Search/filter parameters belong on read models, not commands
 - Command attributes should match attributes on entities or value objects
 
-### update_command
+### update_commands
 
-Modify a command — rename or change fields. Field operations are applied in order: remove -> update -> add.
+Modify one or more commands in a single atomic workflow write — rename or change fields. Pass an array of command updates; for a single command, pass an array with one element. Field operations are applied per command in order: remove → update → add.
 
 - `workflowId` — Identifies the workflow
-- `command` — `$ref` path to the command (e.g., `#/schemas/commands/PlaceOrder`)
-- `name` — New name (optional)
-- `addFields`, `updateFields`, `removeFields` — Field modifications
+- `commands` — Array of command updates, each with:
+  - `command` — `$ref` path to the command (e.g., `#/schemas/commands/PlaceOrder`). Required.
+  - `name` — New name (optional)
+  - `addFields`, `updateFields`, `removeFields` — Field modifications
+
+The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_command
 
@@ -245,21 +252,20 @@ state). Domain event schemas are created directly on domain events and automatic
 a Domain Event card on that event. Use `get_workflow` to see existing domain event schemas
 under `schemas/domainEvents/`.
 
-### create_domain_event_schema
+### create_domain_event_schemas
 
-Define a new domain event schema with payload fields, attached to a specific domain event.
-Auto-creates a Domain Event card on the event. The schema represents the data that is published
-when the event fires.
+Define one or more domain event schemas in a single atomic workflow write. Pass an array of schemas, each bound to a domain event; for a single schema, pass an array with one element. Auto-creates a Domain Event card on each event. Schemas represent the data payload published when the event fires. Each event can have only one domain event schema, so each schema in the batch must target a different event.
 
 - `workflowId` — Identifies the workflow
-- `domainEvent` — `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`). Required.
-- `name` — Schema name with spaces (e.g., "Order Placed", "Payment Processed")
-- `entity` — `$ref` path to the aggregate root entity that produces this event (e.g., `#/schemas/entities/Order`). Recommended.
-- `fields` — Array of field definitions representing the event payload:
-  - `name` — Field name in camelCase
-  - `relatedEntity` — `$ref` path to a related entity. Use for nested event data (e.g., order items carried in the event).
-  - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
-  - `fields` — Nested field names from the related entity (for reference fields)
+- `domainEventSchemas` — Array of schema definitions, each with:
+  - `domainEvent` — `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`). Required.
+  - `name` — Schema name with spaces (e.g., "Order Placed", "Payment Processed")
+  - `entity` — `$ref` path to the aggregate root entity that produces this event (e.g., `#/schemas/entities/Order`). Recommended.
+  - `fields` — Array of field definitions representing the event payload:
+    - `name` — Field name in camelCase
+    - `relatedEntity` — `$ref` path to a related entity. Use for nested event data (e.g., order items carried in the event).
+    - `cardinality` — `"one-to-one"` or `"one-to-many"` for fields with `relatedEntity`
+    - `fields` — Nested field names from the related entity (for reference fields)
 
 **Field design rules for domain event schemas:**
 
@@ -268,16 +274,18 @@ when the event fires.
 - Capture what happened, not the full entity state — usually 3 to 8 fields
 - Field names should be consistent with command and entity field names where applicable
 
-### update_domain_event_schema
+### update_domain_event_schemas
 
-Modify a domain event schema — rename, change entity, or modify fields. Field operations are
-applied in order: remove -> update -> add.
+Modify one or more domain event schemas in a single atomic workflow write — rename, change entity, or modify fields. Pass an array of schema updates; for a single schema, pass an array with one element. Field operations are applied per schema in order: remove → update → add.
 
 - `workflowId` — Identifies the workflow
-- `domainEventSchema` — `$ref` path to the schema (e.g., `#/schemas/domainEvents/OrderPlaced`)
-- `name` — New name (optional)
-- `entity` — Updated aggregate root entity `$ref` path (optional, empty string to remove)
-- `addFields`, `updateFields`, `removeFields` — Field modifications
+- `domainEventSchemas` — Array of schema updates, each with:
+  - `domainEventSchema` — `$ref` path to the schema (e.g., `#/schemas/domainEvents/OrderPlaced`). Required.
+  - `name` — New name (optional)
+  - `entity` — Updated aggregate root entity `$ref` path (optional, empty string to remove)
+  - `addFields`, `updateFields`, `removeFields` — Field modifications
+
+The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_domain_event_schema
 
@@ -292,33 +300,38 @@ Remove a domain event schema and its card from the event.
 
 Read models represent data queries and views — what the API returns to callers (GET endpoints / query operations). Use `get_workflow` to see existing read models. See `references/read-model-generation.md` for field design rules.
 
-### create_read_model
+### create_read_models
 
-Define a new read model/query, attached to a specific domain event. Auto-creates a Read Model card on the event.
+Define one or more read models/queries in a single atomic workflow write. Pass an array of read models, each bound to a domain event; for a single read model, pass an array with one element. Auto-creates a Read Model card on each event.
 
-- `workflowId` — Identifies the workflow
-- `domainEvent` — Required. `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`)
-- `name` — Read model name with spaces (e.g., "Get Order Details")
-- `cardinality` — Required. `"one-to-one"` or `"one-to-many"`
-- `entity` — Recommended. `$ref` path to the source entity (e.g., `#/schemas/entities/Order`)
-- `fields` — Array of field definitions. Each field:
-  - `name` — camelCase
-  - `isFilter` — Boolean; mark query/filter parameters
-  - `computed` — Boolean; mark fields calculated at runtime
-  - `relatedEntity` — `$ref` path; use for nested composed data
-  - `cardinality` — `"one-to-one"` or `"one-to-many"` for `relatedEntity` fields
-  - `fields` — Nested sub-fields when `relatedEntity` is set
-
-### update_read_model
-
-Modify a read model — rename, change source entity, or modify fields. Field operations are
-applied in order: remove -> update -> add.
+**Reuse:** if two entries in the batch (or an entry and an existing workflow query) share the same `name`, both events are linked to the same underlying read model and their fields are unioned. Use this to share a query across multiple events (e.g., "Get Order Details" on several events along an Order's lifecycle).
 
 - `workflowId` — Identifies the workflow
-- `readModel` — `$ref` path to the read model (e.g., `#/schemas/queries/GetOrderDetails`)
-- `name` — New name (optional)
-- `entity` — Updated source entity `$ref` path (optional)
-- `addFields`, `updateFields`, `removeFields` — Field modifications
+- `readModels` — Array of read model definitions, each with:
+  - `domainEvent` — Required. `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`)
+  - `name` — Read model name with spaces (e.g., "Get Order Details")
+  - `cardinality` — Required. `"one-to-one"` or `"one-to-many"`
+  - `entity` — Recommended. `$ref` path to the source entity (e.g., `#/schemas/entities/Order`)
+  - `fields` — Array of field definitions. Each field:
+    - `name` — camelCase
+    - `isFilter` — Boolean; mark query/filter parameters
+    - `computed` — Boolean; mark fields calculated at runtime
+    - `relatedEntity` — `$ref` path; use for nested composed data
+    - `cardinality` — `"one-to-one"` or `"one-to-many"` for `relatedEntity` fields
+    - `fields` — Nested sub-fields when `relatedEntity` is set
+
+### update_read_models
+
+Modify one or more read models in a single atomic workflow write — rename, change source entity, or modify fields. Pass an array of read model updates; for a single read model, pass an array with one element. Field operations are applied per read model in order: remove → update → add.
+
+- `workflowId` — Identifies the workflow
+- `readModels` — Array of read model updates, each with:
+  - `readModel` — `$ref` path to the read model (e.g., `#/schemas/queries/GetOrderDetails`). Required.
+  - `name` — New name (optional)
+  - `entity` — Updated source entity `$ref` path (optional)
+  - `addFields`, `updateFields`, `removeFields` — Field modifications
+
+The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_read_model
 
@@ -332,7 +345,7 @@ Remove a read model and its card from the event.
 ## Card Tools
 
 Cards attach domain model elements and requirements to events. Most domain model cards are
-created automatically by dedicated tools (`create_command`, `create_read_model`,
+created automatically by dedicated tools (`create_commands`, `create_read_models`,
 `create_domain_event` with `aggregateRoot`). Use `create_card` only for other card types
 like User Story.
 
@@ -343,10 +356,10 @@ role. Call this before creating cards to get the correct `cardTypeId` values.
 
 Common card types:
 
-- **Command** — Created automatically via `create_command`
+- **Command** — Created automatically via `create_commands`
 - **AggregateRoot** — Created automatically via `create_domain_event` with `aggregateRoot` parameter
-- **ReadModel** — Created automatically via `create_read_model`
-- **DomainEvent** — Created automatically via `create_domain_event_schema`
+- **ReadModel** — Created automatically via `create_read_models`
+- **DomainEvent** — Created automatically via `create_domain_event_schemas`
 - **GivenWhenThen** — Created automatically via `create_domain_event` with `acceptanceCriteria` parameter
 - **UserStory** — Use `create_card` for this type
 
