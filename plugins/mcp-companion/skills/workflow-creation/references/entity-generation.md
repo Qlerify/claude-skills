@@ -37,6 +37,10 @@ Include ALL command attributes without exception. Do NOT filter or omit:
 - Signature fields (e.g., `deliverySignature`)
 - Note fields (e.g., `deliveryNotes`)
 
+### User-Supplied Attributes
+
+Attributes the user explicitly asks for and clearly ties to a specific entity in the workflow may also be added to that entity, even if they don't appear in any command.
+
 ### Step-by-Step Derivation
 
 1. Identify the input data/arguments for each command
