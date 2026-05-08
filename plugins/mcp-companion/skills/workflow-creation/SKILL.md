@@ -33,7 +33,7 @@ First extract one aggregate at a time (use the extract-aggregate skill):
 A Qlerify workflow is a structured (Software Design Level) Event Storming diagram combined with detailed elements and concepts from domain-driven design (DDD):
 
 - **Lanes** — Horizontal swimlanes representing **roles** — actors that invoke commands. Either a human role (e.g., "Customer", "Hotel Staff") or the exact word "Automation" for any system-triggered step. All automated steps share the single Automation lane — do NOT create lanes for internal services (Payment Service, Notification Service, etc.); those belong in bounded contexts. See "Lane Tools" in `references/tools.md` for full naming rules.
-- **Domain Events** — Always placed in sequence within lanes. Each event represents something that happened in a business process (e.g., "Order Created", "Payment Received"). Contains a verb in past tense. A domain event is the result of a role invoking a state-changing command on an aggregate. Valid: Order Created, Invoice Approved, Payment Cancelled. Invalid (no state change): Page Viewed, Form Opened. Domain Events are the starting point of the modeling process — they are usually created before entities, commands, or read models, which are all later linked or attached to events (through Cards).
+- **Domain Events** — Always placed in sequence within lanes. Each event represents something that happened in a business process (e.g., "Order Created", "Payment Received"). Contains a verb in past tense. A domain event is the result of a role invoking a state-changing command on an aggregate. Valid: Order Created, Invoice Approved, Payment Cancelled. Invalid (no state change): Page Viewed, Form Opened. Domain Events are the starting point of the modeling process — they are usually created before entities, commands, or read models, which are all later linked or attached to events.
 - **Entities** — An Entity is a domain object that is defined by its identity, not by its attributes. An entity must have an id attribute and a life cycle. Entities can have attributes and other related entities. Some entities play the role of aggregate root from the perspective of a given command. Examples: Order, Customer, Product.
 - **Value Objects** — A VO is a domain object that is defined by its attributes. A VO has no identity and is immutable (replaced as a whole when updated). Examples: Money (amount + currency), Address (street + city + postal code), Date Range (start date + end date). A VO must not have an id attribute.
 - **Commands** — A Command is a state-changing operation invoked on an aggregate and can trigger a domain event. Commands and domain events have a one-to-one relationship. Commands have arguments (also referred to as fields, attributes or properties) representing data that the actor (human or automation) submits. Examples: "Create Order", "Cancel Subscription", "Add Item to Cart".
@@ -87,11 +87,15 @@ its current state. For a new workflow, call `create_workflow` with a descriptive
 
 **Step 2 — Create domain events** *(see `references/event-generation.md` for naming and chronology rules)*
 
-Build the event flow by chaining calls to `create_domain_event`. Each event needs:
+Use `create_domain_events` to build the whole event flow in one call. Pass an array of events in
+the chronological order they occur in the business process. For inserting one or two events into
+an existing workflow afterwards, use the singular `create_domain_event`.
+
+Each entry needs:
 
 - `description` — Aggregate Name + Space + Past Tense Verb
 - `lane` — The role/actor the event belongs to (e.g., "Customer", "Automation"). Auto-created on the fly the first time an unfamiliar name is referenced, so you typically don't need `create_lane` when building a workflow from scratch. Pass exactly the same name (case-sensitive) across events that share a lane.
-- `follows` — A `$ref` path to the preceding event, or `"start"` for flow entry points
+- `follows` — `"start"` for flow entry points, the bare description of an event created earlier in this same array, or a `$ref` path to an event that already exists in the workflow
 - `type` — Either `domainEvent` (regular event) or `decision` (decision diamond)
 
 **Common lane patterns:**
@@ -167,8 +171,8 @@ For each domain event, specify the name and arguments (also referred to as field
 3. Referenced Entity or Value Object (same bounded context): Implicitly typed as object but must never contain any nested sub-fields. Can be a single reference or a collection; set `cardinality` to `"one-to-one"` for a single reference and `"one-to-many"` for a collection. Use this when the referenced entity or value object lives within the same bounded context but outside the current aggregate's consistency boundary, and is not mutated. Unlike a Category 2 reference, the structural attributes of the referenced entity or value object are known (although not included here in the command); unlike Category 4, it is not mutated. Field name must be in camelCase without Id suffix. Do not model any nested sub-fields in your reply. The absence of nested sub-fields shows that we are not mutating the related entity or value object (mutations use Category 4). Omit the Id suffix, since the technical decision of how the reference is implemented is a later concern. Examples: currency, country, shippingMethod.
 4. Nested Related Entity or Value Object to Be Mutated: Implicitly typed as an object. It must always contain at least one nested sub-field. It may be a single object or a collection; set `cardinality` to `"one-to-one"` for a single object and `"one-to-many"` for a collection. Use this when creating or updating one or more nested entities or VOs inside the aggregate. This field name should be the camelCase form of the targeted nested entity or VO name. Exception: when the same Entity/VO type fills multiple semantic roles on the aggregate, name each field after the role and let multiple fields point to the same `relatedEntity` (e.g., `shippingAddress` and `billingAddress` both referencing a VO named "Address"). Never use generic or implementation-specific command argument names such as options, data, params, or payload when targeting an underlying entity or VO. The nested sub-field names must be identical to the attribute names of the targeted related entity or VO. Nested attributes may themselves be Category 4 fields, with their own second level of nested sub-fields. For example, if the aggregate has an entity/VO structure with three levels — order => orderItems => taxRate — then the command setTaxRate should mirror all levels in its argument structure: setTaxRate({ id: "order-123", orderItems: [{ id: "item-456", taxRate: { percentage: 25, countryCode: "SE" } }] }). Note that the id fields are named exactly id and that the value object has no id. Follow this pattern even for batch operations that update multiple nested items: mirror all nested levels in the command structure.
 
-**Every event should have a command.** After creating commands, call `get_workflow` and verify there
-are no events without a command card. Events without commands represent gaps in the business process.
+**Every event should have a command.** After creating commands, call `get_workflow` and verify
+every event has one. Events without commands represent gaps in the business process.
 
 - **Search/filter parameters do NOT belong on commands** — they belong on Read Models with `isFilter: true`
 
@@ -300,10 +304,11 @@ update_domain_event(domainEvent: "#/domainEvents/OrderPlaced", color: "blue")
 ## Constraints and Rules
 
 - **Every domain event should have a command and an aggregate root** — No naked events. Domain event schemas are optional and only expected for Event Sourcing workflows (see Step 7)
-- **One Command card per event** — An event can only have one command
-- **One Aggregate Root card per event** — An event can only have one entity linked as aggregate root
-- **One Domain Event card per event** — An event can only have one domain event schema (when one is created)
-- **Read Model cards require cardinality** — Always specify "one-to-one" or "one-to-many"
+- **One command per event** — An event can only have one command
+- **One aggregate root per event** — An event can only have one entity linked as aggregate root
+- **One domain event schema per event** — An event can only have one domain event schema (when one is created)
+- **An event can have multiple read models** — Different read models on the same event are fine (e.g. "Get Order" + "List Orders" both on `OrderPlaced`); only attaching the same read model name twice is rejected
+- **Read models require cardinality** — Always specify "one-to-one" or "one-to-many"
 - **Lanes cannot be deleted if they contain events** — Move or delete events first
 - **Domain events require a lane** — Every event must be assigned to an actor
 - **Chain events via follows** — Use "start" for root events, otherwise reference the parent via `$ref` path
@@ -311,15 +316,15 @@ update_domain_event(domainEvent: "#/domainEvents/OrderPlaced", color: "blue")
 
 ## `relatedEntity` Usage Summary
 
-| Context                               | Use `relatedEntity`?                          | Example                                     |
-| ------------------------------------- | --------------------------------------------- | ------------------------------------------- |
-| Command: primitive type               | **NO** — use flat primitive field             | `bookingId: "bk-001"`                       |
-| Command: nested structure             | **YES** — multiple fields needed              | `orderItems: [{ productName, qty, price }]` |
-| Read Model: nested structure          | **YES** — nested joined data                  | `guest: { firstName, lastName, email }`     |
-| Read Model: filter parameter          | **NO** — use flat field with `isFilter: true` | `checkInDate` (isFilter)                    |
-| Domain Event: nested structure        | **YES** — nested event payload data           | `orderItems: [{ productId, qty, price }]`   |
-| Domain Event: ID reference            | **NO** — use flat field                       | `orderId`, `customerId`                     |
-| Entity: related entity                | **YES** — defines data model links            | `order → OrderItem (one-to-many)`           |
+| Context                        | Use `relatedEntity`?                          | Example                                     |
+|--------------------------------|-----------------------------------------------|---------------------------------------------|
+| Command: primitive type        | **NO** — use flat primitive field             | `bookingId: "bk-001"`                       |
+| Command: nested structure      | **YES** — multiple fields needed              | `orderItems: [{ productName, qty, price }]` |
+| Read Model: nested structure   | **YES** — nested joined data                  | `guest: { firstName, lastName, email }`     |
+| Read Model: filter parameter   | **NO** — use flat field with `isFilter: true` | `checkInDate` (isFilter)                    |
+| Domain Event: nested structure | **YES** — nested event payload data           | `orderItems: [{ productId, qty, price }]`   |
+| Domain Event: ID reference     | **NO** — use flat field                       | `orderId`, `customerId`                     |
+| Entity: related entity         | **YES** — defines data model links            | `order → OrderItem (one-to-many)`           |
 
 
 **Naming rule:** If using `relatedEntity`, name the field as the entity (`guest`, `hotel`, `orderItems`).
@@ -350,7 +355,7 @@ with `relatedEntity`.
 
 - **Start with events, not entities.** Map the business process flow first, then identify what data each step needs.
 - **Use decision gateways sparingly.** Only for genuine branching logic, not optional steps.
-- **Name events as past-tense occurrences.** "Order Created", not "Create Order" — commands go on cards.
+- **Name events as past-tense occurrences.** "Order Created", not "Create Order" — the command name carries the imperative.
 - **Avoid special characters in event names.** Use only alphanumeric characters and spaces. No `?`, `!`, `&`, `#`.
 - **Include realistic example data.** 3 values per field helps stakeholders understand the model.
 - **After completing the workflow, use the `/download` skill** to save the specification to a file. This is much faster than fetching via MCP tools for large workflows.

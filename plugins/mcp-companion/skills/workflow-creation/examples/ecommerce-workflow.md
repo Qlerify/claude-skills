@@ -20,72 +20,31 @@ create_workflow(projectId: "proj-1", name: "Simple Order Process")
 
 ### Step 2 — Create domain events
 
-Build the chain left-to-right. Each event references the previous one via `follows`. Lanes
-("Customer", "Warehouse Worker", "Automation") are auto-created the first time each name is
-referenced. Do NOT set `aggregateRoot` yet — entities don't exist. Do NOT set `group` — groups
-are optional and come later.
+Build the whole event flow with one `create_domain_events` bulk call. Entries are processed in
+order; each `follows` references either `"start"`, the description of an earlier sibling in the
+same array, or a `$ref` to an event that already exists. Lanes ("Customer", "Warehouse Worker",
+"Automation") are auto-created the first time each name is referenced. Do NOT set `aggregateRoot`
+yet — entities don't exist. Do NOT set `group` — groups are optional and come later.
 
 ```
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Item Added to Order",
-  type: "domainEvent",
-  lane: "Customer",
-  follows: "start"
-)
--> { $ref: "#/domainEvents/ItemAddedToOrder" }
+create_domain_events(workflowId: "wf-1", projectId: "proj-1", domainEvents: [
+  { description: "Item Added to Order", type: "domainEvent", lane: "Customer", follows: "start" },
+  { description: "Order Placed", type: "domainEvent", lane: "Customer", follows: "Item Added to Order" },
+  { description: "Payment Outcome", type: "decision", lane: "Automation", follows: "Order Placed" },
+  { description: "Payment Confirmed", type: "domainEvent", lane: "Automation", follows: "Payment Outcome" },
+  { description: "Payment Failed", type: "domainEvent", lane: "Automation", follows: "Payment Outcome" },
+  { description: "Order Shipped", type: "domainEvent", lane: "Warehouse Worker", follows: "Payment Confirmed" }
+])
+```
 
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Order Placed",
-  type: "domainEvent",
-  lane: "Customer",
-  follows: "#/domainEvents/ItemAddedToOrder"
-)
--> { $ref: "#/domainEvents/OrderPlaced" }
+After the bulk call, set the gateway branch labels with two `update_domain_event` calls:
 
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Payment Outcome",
-  type: "decision",
-  lane: "Automation",
-  follows: "#/domainEvents/OrderPlaced"
-)
--> { $ref: "#/domainEvents/PaymentOutcome" }
-
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Payment Confirmed",
-  type: "domainEvent",
-  lane: "Automation",
-  follows: "#/domainEvents/PaymentOutcome"
-)
--> { $ref: "#/domainEvents/PaymentConfirmed" }
-
-# Set condition label on gateway branch
+```
 update_domain_event(workflowId: "wf-1", projectId: "proj-1",
   domainEvent: "#/domainEvents/PaymentConfirmed", conditionLabel: "Success")
 
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Payment Failed",
-  type: "domainEvent",
-  lane: "Automation",
-  follows: "#/domainEvents/PaymentOutcome"
-)
--> { $ref: "#/domainEvents/PaymentFailed" }
-
 update_domain_event(workflowId: "wf-1", projectId: "proj-1",
   domainEvent: "#/domainEvents/PaymentFailed", conditionLabel: "Failed")
-
-create_domain_event(
-  workflowId: "wf-1", projectId: "proj-1",
-  description: "Order Shipped",
-  type: "domainEvent",
-  lane: "Warehouse Worker",
-  follows: "#/domainEvents/PaymentConfirmed"
-)
--> { $ref: "#/domainEvents/OrderShipped" }
 ```
 
 ---
