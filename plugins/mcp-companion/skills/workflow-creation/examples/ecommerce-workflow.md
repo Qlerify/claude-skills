@@ -1,6 +1,6 @@
 # Example: Simple Order Management Workflow
 
-The creation sequence of a simple example order management workflow described.
+The creation sequence of a simple example order management workflow is described below.
 All IDs and `$ref` paths below are illustrative — actual calls return real UUIDs and paths.
 
 ---
