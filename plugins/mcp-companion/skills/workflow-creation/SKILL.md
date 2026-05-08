@@ -6,11 +6,16 @@ description: >
    "create BPMN diagram", "model a business process", "set up domain events",
    "add commands and read models to workflow", or any request involving building
    a Qlerify workflow from scratch or adding structural elements to an existing one.
-   If the user wants to model from an existing or legacy codebase, first extract
-   one aggregate at a time (use the extract-aggregate skill, typically one
-   workflow per aggregate), then continue with this skill.
+   ALSO use this skill for reverse-engineering from existing code — requests like
+   "reverse engineer the codebase", "extract the Order aggregate", "model a legacy
+   application as a workflow", "build a workflow from this code". For codebase-driven
+   modeling, isolate one DDD aggregate at a time and use one Qlerify workflow per
+   aggregate. The skill handles aggregate extraction (Phase 0) and workflow creation
+   in a single end-to-end pass; adjustments are made at the end via the Phase 4
+   validation loop, which for reverse-engineered workflows also reconciles the final
+   model against the source code.
    Provides the full creation sequence, tool ordering, and domain modeling guidance.
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash
 ---
 
 # Workflow Creation Guide
@@ -20,13 +25,15 @@ or calling tools out of order leads to broken references and incomplete diagrams
 
 ## Reverse-engineering from existing code
 
-When the source of truth is an existing or legacy codebase, do not jump directly into workflow creation.
-First extract one aggregate at a time (use the extract-aggregate skill):
+When the source of truth is an existing or legacy codebase, run **Phase 0** below to
+extract the aggregate from code, then continue straight into Phase 1+. Recommend
+one DDD aggregate at a time, one Qlerify workflow per aggregate. Phase 0 feeds
+directly into the rest of the creation sequence — do not pause for user review;
+corrections happen at the end via the Phase 4 loop, which combines structural
+validation (Step 9) with a codebase reconciliation diff (Step 10).
 
-1. Isolate one aggregate at a time
-2. Use one Qlerify workflow per aggregate
-3. Review the extracted aggregate plan with the user
-4. Then return to this skill to model the workflow
+For greenfield workflow creation (no existing codebase), skip Phase 0 entirely and
+start at Phase 1.
 
 ## Core Concepts
 
@@ -75,6 +82,90 @@ afterward to verify the actual `$ref` key before referencing it in subsequent ca
 ## Creation Sequence
 
 Follow these steps in order. Each step depends on the previous one.
+
+### Phase 0: Extract aggregate from codebase (reverse-engineering only)
+
+**Skip this phase entirely for greenfield workflow creation.** Run it only when the
+source is an existing or legacy codebase. Output feeds directly into Phase 1+ — do
+NOT pause for user review or produce a separate review document; corrections happen
+at the end via Phase 4, which validates the workflow structurally (Step 9) and then
+reconciles it against the source code (Step 10).
+
+If the user has not specified **which** aggregate or **which** codebase, ask before
+scanning. You need both:
+
+- `{AGGREGATE_NAME}` — the aggregate to extract (e.g., `Order`, `Subscription`, `Cart`)
+- `{CODEBASE_NAME}` — the repo, service, or module to extract it from
+
+Recommend: one DDD aggregate at a time, one Qlerify workflow per aggregate.
+
+**Step 0.1 — Isolate the aggregate from the service layer**
+
+Most business applications have two command layers:
+
+1. **Service layer** — workflows or application services that coordinate commands across multiple aggregates.
+2. **Aggregate-level commands** — the actual mutation surface of the aggregate itself.
+
+When modeling the aggregate in isolation, peel away the service layer to expose the underlying aggregate commands. If the codebase has a service or orchestrator that coordinates another module and then calls a method on the `{AGGREGATE_NAME}` module, the aggregate command is **that method call** — not the orchestration name. The orchestration stays outside; the aggregate only knows about the data it receives.
+
+Search for the aggregate module and its entry points:
+
+- `src/domain/{AGGREGATE_NAME}/`, `src/modules/{AGGREGATE_NAME}/`, `**/{AGGREGATE_NAME}.ts`, `**/{AGGREGATE_NAME}.cs`, `**/{AGGREGATE_NAME}.java`
+- Look for repositories, aggregate roots, domain services, and application services that call into them
+- Distinguish orchestration (service layer) from mutation (aggregate layer)
+
+**Step 0.2 — Capture the aggregate structure**
+
+Extract the following, scoped to the `{AGGREGATE_NAME}` boundary. Cross-aggregate
+orchestration lives **outside** — note that it exists, but do not model it.
+
+- **Aggregate root entity** — top-level entity through which all mutations enter. Identified by ownership of children (it holds the collections) and by being the entry point that services call into.
+- **Related entities** — children with their **own identity** and individual lifecycle (add / update / remove).
+- **Value objects** — children that are **replaced wholesale** (set-replacement semantics), with no independent lifecycle. They may still have technical IDs in the implementation — treat them as VOs anyway if the domain semantics are set-replacement.
+- **Commands** — each represents a distinct state change of the aggregate.
+  - If one command always triggers another, **merge them** into a single command.
+  - Find a granularity **coarser than per-attribute changes** but **finer than create/update/delete** for the whole aggregate. The right level is one where each command represents a business-meaningful action.
+  - For value objects, usually only one command is needed to set the value; clearing or removal can be modeled as setting a blank or empty value.
+  - Note which fields are create-only — required on create but not available on update.
+- **Domain events** — one event per command, forming **1:1 pairs**. Aim for **8–20 events** per aggregate. Too many → hard for stakeholders to review on an event storming board. Too few → system becomes hard to reason about.
+- **Read models / queries** — queries needed by the client. Can contain **computed or derived fields** (totals, counts) that exist on API responses but not on entity models. When a field is clearly projection-only, prefer listing it on the read model instead of also on entity/VO attribute tables.
+- **Attributes** — **all** fields for every entity and VO: name, type, required/optional, defaults, notes. Prefer domain/type definitions over database schema. Describe relationships in type form (e.g. `Order.items: LineItem[]`), not database form. Omit internal back-reference fields like `parent_id` or FK fields unless they are domain-significant. Capture a short description for each entity and each attribute.
+- **Invariants** — business rules: required fields, non-negative amounts, set-replacement semantics, snapshot patterns, computed-only fields.
+- **Tests** — for each aggregate command, extract tests that validate the command's behavior **at the aggregate boundary**, in business language. If only service-level tests exist, extract only the part that proves aggregate behavior; ignore external orchestration. Example: "Given no Order exists, When the caller creates an Order with a valid customer id, Then an Order is returned with an assigned id." These map to `acceptanceCriteria` on events in Phase 2 Step 2.
+- **External references** — fields pointing to **other aggregates by ID only** (e.g., `customerId` → `Customer` in a separate bounded context). Do **not** model the external aggregate's internals.
+
+**Step 0.3 — Stay within scope**
+
+Model only the `{AGGREGATE_NAME}` aggregate boundary. Cross-aggregate orchestration (e.g., completing one aggregate triggering creation of another, external rule evaluation computing values passed in) lives **outside** — note that it exists, but do not model it.
+
+Model the aggregate as a **domain/type model**, not a persistence model. Avoid database terms like foreign keys, join tables, and cascade deletes unless they are needed to explain a business rule.
+
+**Step 0.4 — Feed Phase 0 output into the rest of the creation sequence**
+
+Use the extracted information directly to drive Phase 1+. Do not produce a separate
+markdown review document for the user. The mapping is:
+
+| Extracted concept                         | Goes into                                          |
+|-------------------------------------------|----------------------------------------------------|
+| Domain events                             | Phase 2 Step 2 (`create_domain_events`)            |
+| Aggregate root, related entities, VOs     | Phase 3 Step 4 (`create_entities`)                 |
+| Commands                                  | Phase 3 Step 5 (`create_commands`)                 |
+| Read models / queries                     | Phase 3 Step 6 (`create_read_models`)              |
+| Attributes                                | Phase 3 Step 8 (`update_entities`)                 |
+| Tests (Given/When/Then)                   | `acceptanceCriteria` on events in Phase 2 Step 2   |
+| Invariants                                | Verified in Phase 4 (`validate_domain_model`)      |
+| External references (IDs to other BCs)    | Category 2 ID-only refs in commands (Phase 3 Step 5) |
+| Bounded context grouping                  | Phase 3 Step 3 (`create_bounded_context`)          |
+
+**Extraction guidelines**
+
+- **Peel the service layer first.** The most common mistake is naming the orchestrator as the aggregate command.
+- **VOs vs entities** is decided by lifecycle semantics, not by whether the implementation has an ID column.
+- **Merge commands that always fire together** — event storming is for business-meaningful steps, not implementation steps.
+- **Prefer domain types over DB types.** If the code uses `varchar`, write `string`; if it uses `@relation`, write `Order.items: LineItem[]`.
+- **Keep external aggregates opaque.** A `customerId` field is enough; do not pull in `Customer` internals.
+
+After completing Phase 0, proceed directly to Phase 1.
 
 ### Phase 1: Foundation
 
@@ -246,7 +337,7 @@ update_entities(workflowId: "wf-1", entities: [
 - Mark fields essential for creation with `isRequired: true`
 - Fields populated only during specific lifecycle transitions (cancel, archive, complete) should NOT be set as required fields
 
-### Phase 4: Validation Loop
+### Phase 4: Validation & Reconciliation Loop
 
 **Step 9 — Validate and fix the domain model**
 
@@ -273,11 +364,62 @@ commands/read models and their aggregate root entities.
 
 **Important:** Do not consider the workflow complete until every remaining issue has been consciously reviewed and either fixed or judged as a legitimate pattern.
 
+**Step 10 — Reconcile workflow against source code (reverse-engineering only)**
+
+> **Skip this step entirely for greenfield workflow creation.** It applies only when Phase 0 ran — when the workflow was extracted from an existing codebase and there is source code to compare the final model against.
+
+Step 9 only checks the workflow against itself. For reverse-engineered workflows, the higher-risk question is whether the final model still matches the *source code* it was extracted from. Phase 0's extraction can drop commands, miss fields, misclassify an entity vs a value object, or invent events that have no code trigger. This step closes that loop.
+
+**Step 10.1 — Pull the final model**
+
+Call `get_workflow` to retrieve the workflow as it now exists in Qlerify after all create/update calls have landed.
+
+**Step 10.2 — Re-scan the source for the aggregate boundary**
+
+Re-run the searches from Phase 0 Step 0.1 — the aggregate module, its repository, its entry points, and the tests at the aggregate boundary. Do not trust the earlier extraction; re-derive the truth from the code.
+
+**Step 10.3 — Build a reconciliation diff**
+
+For each category below, list what's in the workflow vs what's in the code and flag discrepancies:
+
+| Category                    | In workflow but not in code                                | In code but not in workflow                                            |
+|-----------------------------|------------------------------------------------------------|------------------------------------------------------------------------|
+| Commands                    | Phantom command — models a mutation that does not exist    | Missing command — code has a state-changing method that's not modeled  |
+| Domain events               | Phantom event — no code path produces it                   | Missing event — code emits/persists something not modeled              |
+| Entity fields               | Phantom field on entity                                    | Missing field — code has a domain attribute not on the entity          |
+| Entity vs VO classification | Modeled as entity, code says VO (no id, set-replacement)   | Modeled as VO, code says entity (own id, own lifecycle)                |
+| Cardinality                 | one-to-one vs one-to-many mismatch                         | —                                                                      |
+| External refs               | Workflow models internals of an external aggregate         | —                                                                      |
+| Acceptance criteria         | Event has criteria with no matching test                   | Test at the aggregate boundary with no Given/When/Then on its event    |
+
+**Step 10.4 — Report and ask the user**
+
+Present the diff as a punch list grouped by category. For each item, state which side looks correct and recommend one of: *fix the workflow*, *the code is wrong*, or *accept as a deliberate omission*. Do NOT auto-apply fixes — codebase reconciliation has high false-positive risk, since some discrepancies are intentional (a command deliberately merged with another, a field that's implementation-only, an internal helper that should not be modeled). The user is the only one who can adjudicate.
+
+**Step 10.5 — Apply approved fixes**
+
+For each item the user approves:
+
+- Phantom/missing command → `create_commands` / `update_commands` / `delete_command`
+- Phantom/missing event → `create_domain_event` / `delete_domain_event`
+- Field changes on entities → `update_entities` (`addFields`, `updateFields`, `removeFields`)
+- Misclassified entity/VO → recreate via `create_entities` with the corrected `id` field presence (entities have `id`; VOs do not)
+- Cardinality fix → `update_entities` with corrected `cardinality`
+- Missing acceptance criteria → `update_domain_event` with the Given/When/Then derived from the test
+
+After applying fixes, **re-run Step 9** (`validate_domain_model`) to confirm the structural integrity wasn't broken by the reconciliation edits. The two loops can interact — fixing a missing field can resolve a Step 9 issue, and vice versa.
+
+**Phase 4 stop condition**
+
+Phase 4 is complete when:
+1. Step 9 reports no unreviewed structural issues, AND
+2. Step 10 reports no unreviewed discrepancies between workflow and source code (or N/A for greenfield).
+
 ### Phase 5: Polish (optional)
 
 These steps are cosmetic and can be skipped if not needed.
 
-**Step 10 — Create groups (optional, only on explicit user request)**
+**Step 11 — Create groups (optional, only on explicit user request)**
 
 > **Do NOT create groups as part of a default workflow generation.** Skip this step entirely unless the user explicitly asks for them — e.g., "group the events into phases", "add groups for the checkout/fulfillment stages", "organize events into stages". A newly generated workflow should have zero groups by default.
 
@@ -291,7 +433,7 @@ Common phase patterns (use these as inspiration only when the user asks):
 - E-commerce: "Browse & Cart", "Checkout", "Fulfillment"
 - Onboarding: "Registration", "Verification", "Setup", "Activation"
 
-**Step 11 — Set colors (optional, only on explicit user request)**
+**Step 12 — Set colors (optional, only on explicit user request)**
 
 > **Do NOT set colors as part of a default workflow generation.** Skip this step entirely unless the user explicitly asks for them — e.g., "color-code the events by lane", "make the automation events blue", "highlight the checkout events in green". A newly generated workflow should leave every event on its default peach color.
 
