@@ -94,7 +94,7 @@ create_domain_event(
 
 ### Step 3 — Create bounded context
 
-Just one BC since all events belong to the same part of the system, even the same aggregate.
+Use just one BC since all events belong to the same part of the system, even the same aggregate.
 
 ```
 create_bounded_context(workflowId: "wf-1", projectId: "proj-1", name: "Order Management")
