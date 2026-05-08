@@ -130,7 +130,7 @@ create_entities(workflowId: "wf-1", entities: [
 ### Step 5 — Create commands on events
 
 All commands go in a single `create_commands` bulk call. Each command binds to its own event via
-`domainEvent`. Commands reference the empty entities via `relatedEntity` for nested fields. In this simple example we assume an order id already exists.
+`domainEvent`. Commands reference the empty entities via `relatedEntity` for nested fields. In this simple example we assume a draft order id already exists.
 
 ```
 create_commands(workflowId: "wf-1", commands: [
@@ -353,7 +353,7 @@ The workflow now has:
 - 3 lanes (Customer, Warehouse Worker, Automation) auto-created via `create_domain_event`
 - 6 domain events with a decision gateway for payment, including condition labels
 - 1 entity (Order) and 1 value object (Order Item) with typed fields, relationships, and example data
-- 5 commands attached to events (every event has a command)
+- 5 commands attached to events (every event has a command, decisions don't have commands)
 - 2 read models (Get Order Details, List Orders To Ship) attached to events
 - 5 domain event schemas attached to events (every event has an event payload)
 - 5 aggregate root links set via `aggregateRootFor` on `create_entities`
