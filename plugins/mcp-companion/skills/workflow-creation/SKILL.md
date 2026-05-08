@@ -106,7 +106,7 @@ Each entry needs:
 
 Optional parameters:
 
-- `acceptanceCriteria` — Array of Given-When-Then acceptance criteria strings
+- `acceptanceCriteria` — Array of Given-When-Then acceptance criteria strings. If the input contains test scenarios, behavior specs, or sentences in "Given X, When Y, Then Z" form, attach the relevant ones to each event here — don't leave them as background documentation.
 
 Build the flow left-to-right, creating events in the order they occur in the business process. Do NOT set `aggregateRoot` yet — entities don't exist at this point.
 Do NOT set `group` either — groups are a cosmetic polish step handled later (Phase 5) and only if the user explicitly asks for them.
