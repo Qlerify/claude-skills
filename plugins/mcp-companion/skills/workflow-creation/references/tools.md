@@ -117,12 +117,34 @@ Remove a group. The group must be empty — move or delete all events in it firs
 ## Domain Event Tools
 
 Domain Events are the core building blocks in Event Storming and Event Modeling — they represent things that happen
-in the business process. Use `get_workflow` to see existing events with their linked cards and schemas.
+in the business process. Use `get_workflow` to see existing events with their linked commands, read models, aggregate roots, and schemas.
+
+### create_domain_events
+
+Bulk-create multiple domain events in a single call. Use this when building a new workflow with
+the full event flow — typically the entire chain in one call. For inserting one or two events
+into an existing workflow, use the singular `create_domain_event`.
+
+Lanes are auto-created when first referenced (same as `create_domain_event`), so you don't need to
+create lanes ahead of time. Bounded contexts and aggregate-root entities, if referenced via
+`aggregateRoot`, must already exist.
+
+If validation fails on the Nth entry, entries 1..N-1 are already committed. The tool stops at the
+first failure and returns which entries succeeded and which failed, so you can fix the failed
+entry and call again with only the remaining ones.
+
+- `workflowId`, `projectId` — Identifies the workflow
+- `domainEvents` — Array of event definitions, each with:
+  - `description` — The event name (past-tense). Same rules as `create_domain_event`'s `description` below.
+  - `type` — `'domainEvent'` or `'decision'`
+  - `lane` — Role/actor name. Auto-created if unfamiliar; pass the same name across events that share a lane.
+  - `follows` — One of: `"start"`, a `$ref` path to an existing event, OR (bulk-only) the bare description of an event created earlier in the same array (e.g. `"follows": "Order Placed"`).
+  - `group`, `color`, `aggregateRoot`, `acceptanceCriteria` — Optional, same as `create_domain_event` below.
 
 ### create_domain_event
 
-Add a new domain event to the workflow. This is the most important creation tool — events are what
-make up the process flow.
+Add a single domain event to the workflow. Use this for inserting one or two events into an
+existing workflow. For building a new workflow with many events, use `create_domain_events` instead.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `description` — The event name (use past-tense: "Order Created", not "Create Order"). **Avoid special characters** (`?`, `!`, `&`, `#`, `/`) — they break `$ref` path resolution. Hyphens are removed and the next letter capitalized in `$ref` keys (e.g., "Check-in" → `CheckIn`).
@@ -206,11 +228,11 @@ Remove an entity from the domain model.
 
 ## Command Tools
 
-Commands represent state-changing operations — actions that modify data. They correspond to POST/PUT/DELETE API endpoints or write operations. Commands and domain events have a one-to-one relationship. Commands are created on domain events and attached by automatically creating a command card on that event. Use `get_workflow` to see existing commands.
+Commands represent state-changing operations — actions that modify data. They correspond to POST/PUT/DELETE API endpoints or write operations. Commands and domain events have a one-to-one relationship. Commands are created on and attached to domain events. Use `get_workflow` to see existing commands.
 
 ### create_commands
 
-Define one or more commands in a single atomic workflow write. Pass an array of commands, each bound to a domain event; for a single command, pass an array with one element. Auto-creates a Command card on each event. Commands with their attributes represent the information an actor submits to perform a state-changing action on an aggregate. Each event can have only one command, so each command in the batch must target a different event.
+Define one or more commands in a single atomic workflow write. Pass an array of commands, each bound to a domain event; for a single command, pass an array with one element. Commands with their attributes represent the information an actor submits to perform a state-changing action on an aggregate. Each event can have only one command, so each command in the batch must target a different event.
 
 - `workflowId` — Identifies the workflow
 - `commands` — Array of command definitions, each with:
@@ -245,7 +267,7 @@ The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_command
 
-Remove a command and its card from the event.
+Remove a command from the event.
 
 - `workflowId` — Identifies the workflow
 - `command` — `$ref` path to the command
@@ -256,13 +278,12 @@ Remove a command and its card from the event.
 
 Domain event schemas define the data payload carried when a domain event occurs — the facts
 about what happened. They capture the essential state change information (not the full entity
-state). Domain event schemas are created directly on domain events and automatically create
-a Domain Event card on that event. Use `get_workflow` to see existing domain event schemas
-under `schemas/domainEvents/`.
+state). Domain event schemas are attached directly to domain events. Use `get_workflow` to see
+existing domain event schemas under `schemas/domainEvents/`.
 
 ### create_domain_event_schemas
 
-Define one or more domain event schemas in a single atomic workflow write. Pass an array of schemas, each bound to a domain event; for a single schema, pass an array with one element. Auto-creates a Domain Event card on each event. Schemas represent the data payload published when the event fires. Each event can have only one domain event schema, so each schema in the batch must target a different event.
+Define one or more domain event schemas in a single atomic workflow write. Pass an array of schemas, each bound to a domain event; for a single schema, pass an array with one element. Schemas represent the data payload published when the event fires. Each event can have only one domain event schema, so each schema in the batch must target a different event.
 
 - `workflowId` — Identifies the workflow
 - `domainEventSchemas` — Array of schema definitions, each with:
@@ -297,7 +318,7 @@ The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_domain_event_schema
 
-Remove a domain event schema and its card from the event.
+Remove a domain event schema from the event.
 
 - `workflowId` — Identifies the workflow
 - `domainEventSchema` — `$ref` path to the schema
@@ -310,7 +331,7 @@ Read models represent data queries and views — what the API returns to callers
 
 ### create_read_models
 
-Define one or more read models/queries in a single atomic workflow write. Pass an array of read models, each bound to a domain event; for a single read model, pass an array with one element. Auto-creates a Read Model card on each event.
+Define one or more read models/queries in a single atomic workflow write. Pass an array of read models, each bound to a domain event; for a single read model, pass an array with one element. An event can carry several different read models (e.g. "Get Order Details" + "List Orders" both on `OrderPlaced`); only attaching the same read model name to the same event twice is rejected.
 
 **Reuse:** if two entries in the batch (or an entry and an existing workflow query) share the same `name`, both events are linked to the same underlying read model and their fields are unioned. Use this to share a query across multiple events (e.g., "Get Order Details" on several events along an Order's lifecycle).
 
@@ -343,7 +364,7 @@ The whole batch is atomic: if any update fails validation, none are applied.
 
 ### delete_read_model
 
-Remove a read model and its card from the event.
+Remove a read model from the event.
 
 - `workflowId` — Identifies the workflow
 - `readModel` — `$ref` path to the read model
