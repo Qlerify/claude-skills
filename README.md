@@ -35,7 +35,7 @@ Install the plugin:
 /plugin install mcp-companion@qlerify-plugins
 ```
 
-After installation, skills are available as `/mcp-companion:workflow-creation`, `/mcp-companion:sync`, `/mcp-companion:download`, and `/mcp-companion:extract-aggregate`.
+After installation, skills are available as `/mcp-companion:workflow-creation`, `/mcp-companion:sync`, and `/mcp-companion:download`.
 
 ### Gemini CLI
 
@@ -45,7 +45,6 @@ Install each skill using the `--path` flag:
 gemini skills install https://github.com/qlerify/qlerify-plugins.git --path plugins/mcp-companion/skills/workflow-creation
 gemini skills install https://github.com/qlerify/qlerify-plugins.git --path plugins/mcp-companion/skills/sync
 gemini skills install https://github.com/qlerify/qlerify-plugins.git --path plugins/mcp-companion/skills/download
-gemini skills install https://github.com/qlerify/qlerify-plugins.git --path plugins/mcp-companion/skills/extract-aggregate
 ```
 
 Configure the Qlerify MCP server in `~/.gemini/settings.json` per
@@ -69,8 +68,9 @@ Teaches AI agents how to effectively use Qlerify's MCP server. Contains the foll
 
 #### `workflow-creation`
 
-Guides AI agents through building complete Qlerify workflows from scratch — lanes, groups, domain events, entities,
-commands, read models, cards, and bounded contexts. Includes a full tool reference and a worked e-commerce example.
+Guides AI agents through building complete Qlerify workflows — lanes, domain events, entities, value objects,
+commands, read models, and bounded contexts. Also supports reverse-engineering existing or legacy codebases into
+DDD aggregates with visualized life cycles.
 
 **Triggers:**
 
@@ -78,14 +78,17 @@ commands, read models, cards, and bounded contexts. Includes a full tool referen
 - "build a domain model"
 - "set up domain events"
 - "add commands and read models to workflow"
-- Any request involving building a Qlerify workflow or adding structural elements
+- "extract the Order aggregate from shop-api"
+- "reverse engineer a domain model from this code"
+- "model the Subscription module as a DDD aggregate"
+- Any request involving building a Qlerify workflow, adding structural elements, or modeling from existing code
 
 **What it does:**
 
-1. Follows an 8-step creation sequence (lanes → groups → events → entities → commands on events → read models on events →
-   bounded contexts)
-2. Provides best practices for naming, field modeling, and entity relationships
-3. Supports nested fields on commands and read models for related entity references
+1. Builds the workflow in dependency order: events → bounded contexts → entities → commands → read models → schemas → validation
+2. Reverse-engineers existing codebases into DDD aggregates (root entity, value objects, commands, events, read models, invariants)
+3. Applies naming and modeling best practices, including nested fields for related entity references
+4. Validates the result and reconciles it against the source code at the end
 
 #### `sync`
 
@@ -123,26 +126,6 @@ standard MCP tools for large data.
 2. Pipes to file without AI processing
 3. ~1 second instead of 3-5 minutes for large workflows
 
-#### `extract-aggregate`
-
-Reverse-engineers a single DDD aggregate from an existing or legacy codebase and produces a standalone description
-(root entity, related entities, value objects, commands, domain events, read models, attributes, invariants, external
-references) ready for import into Qlerify and review in an event storming session.
-
-**Triggers:**
-
-- "extract the Order aggregate from shop-api"
-- "reverse engineer a domain model from this code"
-- "model the Subscription module as a DDD aggregate"
-- Any request involving isolating a single aggregate from an existing codebase
-
-**What it does:**
-
-1. Peels the service/orchestration layer away to expose the real aggregate-level commands
-2. Captures the root entity, related entities, value objects (set-replacement semantics), commands, 1:1 domain events,
-   read models, attributes, invariants, and external references
-3. Emits a structured markdown output designed to feed directly into `workflow-creation` or `sync`
-
 ## Usage Examples
 
 ```bash
@@ -150,12 +133,11 @@ references) ready for import into Qlerify and review in an event storming sessio
 /mcp-companion:workflow-creation
 /mcp-companion:sync
 /mcp-companion:download
-/mcp-companion:extract-aggregate
 
 # Or just ask naturally - skills trigger automatically
 > create a workflow for an e-commerce order process
 > sync my domain model with Qlerify
 > download the Cart Microservice workflow to workflow.json
 > save the swagger spec for my workflow to api.yaml
-> extract the Order aggregate from shop-api
+> extract the Order aggregate from shop-api and build a workflow
 ```
