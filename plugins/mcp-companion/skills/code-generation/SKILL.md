@@ -123,6 +123,8 @@ One handler per command, mounted at an HTTP endpoint (or RPC method, per stack).
 5. Emits the corresponding domain event on the in-process bus
 6. Returns success, or surfaces invariant violations as 4xx (not 5xx) using whatever the stack idiomatically uses to distinguish domain errors from infrastructure errors
 
+**Authorization is auth-ready, not auth-stubbed.** The role check runs through a pluggable auth middleware (Fastify hook, Express middleware, NestJS Guard — stack-specific); its default implementation reads the role from an env var or request header so the server can be run and tested immediately. Swap in real auth (JWT, OAuth, session store) by replacing the middleware — handler code doesn't change. Flag the current wiring in the final report so the user knows what to replace before deploying.
+
 ### 4.5 — Read models
 
 A read model can be a direct read against the write side, a database view, or a precomputed projection — pick what's idiomatic for the chosen stack. Default to direct reads; reach for precomputed projections only with a concrete reason (cross-BC reads, measured perf needs, event sourcing).
