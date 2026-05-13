@@ -151,6 +151,12 @@ Place tests structurally: one test file per aggregate, one `describe` per comman
 
 After generating, run the full suite (Phase 5).
 
+### 4.8 — Test frontend
+
+For the default stack, generate a simple static frontend that exercises every command and read model — one page per aggregate, pre-filled with example data from the model (`exampleData` arrays and GWT inputs) so the user can submit a working request on first load. Keep it static (no build step, no framework) unless the chosen stack already has a frontend convention.
+
+For non-default stacks, ask once whether to include a test frontend — the user may already have one or prefer a separate UI tool (Postman, Bruno, Insomnia).
+
 ## Phase 5: Test-and-iterate loop
 
 1. Run the full test suite.
