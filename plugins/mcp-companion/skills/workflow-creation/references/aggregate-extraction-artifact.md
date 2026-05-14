@@ -96,11 +96,11 @@ objects. Mark each node as **(aggregate root)**, **(Related Entity)**, or
 
 \`\`\`
 Cart (aggregate root)
-├── billing_address           : Address                         (Value Object)
-├── items[]                   : LineItem                        (Related Entity)
+├── billingAddress            : Address                         (Value Object)
+├── lineItems[]               : LineItem                        (Related Entity)
 │   ├── adjustments[]         : LineItemAdjustment              (Value Object — set-replaced)
-│   └── tax_lines[]           : LineItemTaxLine                 (Value Object — set-replaced)
-└── credit_lines[]            : CreditLine                      (Related Entity)
+│   └── taxLines[]            : LineItemTaxLine                 (Value Object — set-replaced)
+└── creditLines[]             : CreditLine                      (Related Entity)
 \`\`\`
 
 **Why these classifications:**
@@ -109,7 +109,7 @@ Cart (aggregate root)
 - Adjustments are exposed through `set…` commands that replace the full collection
   atomically. Their IDs are technical. They are **Value Objects**.
 - `Address` exists at most once on the cart and is replaced wholesale by
-  `SetBillingAddress` — **Value Object**, despite having a DB id.
+  `Set Billing Address` — **Value Object**, despite having a DB id.
 ```
 
 The "Why these classifications" block is the most important content in the entire
@@ -133,12 +133,12 @@ and pricing artefacts until it is either abandoned or converted to an order.
 
 | Attribute     | Type              | Req                    | Default | Notes                                    |
 |---------------|-------------------|------------------------|---------|------------------------------------------|
-| id            | string            | yes (system-generated) | —       | Prefix `cart_`. Create-only.             |
-| currency_code | string (ISO-4217) | yes                    | —       | Normalised to lower-case. Create-only.   |
-| customer_id   | string \| null    | no                     | null    | External reference → Customer aggregate. |
-| email         | string \| null    | no                     | null    | Email of the buyer.                      |
-| items         | LineItem[]        | no                     | []      | Owned collection, see §4.                |
-| ...           |                   |                        |         |                                          |
+| id           | string            | yes (system-generated) | —       | Prefix `cart_`. Create-only.             |
+| currencyCode | string (ISO-4217) | yes                    | —       | Normalised to lower-case. Create-only.   |
+| customerId   | string \| null    | no                     | null    | External reference → Customer aggregate. |
+| email        | string \| null    | no                     | null    | Email of the buyer.                      |
+| lineItems    | LineItem[]        | no                     | []      | Owned collection, see §4.                |
+| ...          |                   |                        |         |                                          |
 ```
 
 Note rollup/computed fields as **projections** in the read-model section, NOT here.
@@ -165,19 +165,20 @@ The Cart aggregate exposes **N commands**. Each has a 1:1 domain event.
 Workflow-level orchestration (promotion evaluation, tax calculation, order
 creation) is explicitly **not** an aggregate command.
 
-| #   | Command         | Payload (aggregate-facing)                                        | Notes                   |
-|-----|-----------------|-------------------------------------------------------------------|-------------------------|
-| 1   | **CreateCart**  | `currency_code`, `region_id?`, `customer_id?`, `email?`, `items?` | Atomic: may seed items. |
-| 2   | **AddLineItem** | `cartId`, `items: LineItem[]`                                     | Creates entities.       |
-| ... |                 |                                                                   |                         |
+| #   | Command            | Payload (aggregate-facing)                                                | Notes                                                  |
+|-----|--------------------|---------------------------------------------------------------------------|--------------------------------------------------------|
+| 1   | **Create Cart**    | `currencyCode`, `regionId?`, `customerId?`, `email?`, `lineItems?`        | Atomic: may seed line items.                           |
+| 2   | **Add Line Item**  | `id`, `lineItems` (one-to-many; no `id` per new item)                     | Creates new line item entities under the cart.         |
+| ... |                    |                                                                           |                                                        |
 
 **Commands explicitly merged or omitted:**
-- `addLineItemAdjustments` — merged into `SetLineItemAdjustments`; per CLAUDE.md,
-  set-replacement is the canonical pattern.
+- `Add Line Item Adjustments` — merged into `Set Line Item Adjustments`; the
+  aggregate exposes set-replacement only, so a separate add command would just
+  re-implement the merged result.
 - Cart completion (create order) — NOT an aggregate command; lives in a
   cross-aggregate workflow.
 - Promotion evaluation — NOT an aggregate command; lives in the promotion workflow
-  which then calls `SetLineItemAdjustments`.
+  which then calls `Set Line Item Adjustments`.
 ```
 
 The "Commands explicitly merged or omitted" block is critical. It documents the
@@ -186,16 +187,19 @@ section when any merges or omissions were made.
 
 ### Section 8: Domain Events
 
-A 1:1 table mapping each command to its event.
+A 1:1 table mapping each command to its event. Event names in the example use
+the spaced Title Case past-tense form Qlerify renders to users (e.g.,
+"Cart Created"); the compact form (`CartCreated`) is the `$ref` key Qlerify
+derives — `#/domainEvents/CartCreated`.
 
 ```markdown
 ## 8. Domain Events
 
-| #   | Event         | Emitted by  |
-|-----|---------------|-------------|
-| 1   | CartCreated   | CreateCart  |
-| 2   | LineItemAdded | AddLineItem |
-| ... |               |             |
+| #   | Event           | Emitted by     |
+|-----|-----------------|----------------|
+| 1   | Cart Created    | Create Cart    |
+| 2   | Line Item Added | Add Line Item  |
+| ... |                 |                |
 ```
 
 ### Section 9: Read Models / Queries
@@ -237,11 +241,11 @@ A numbered list of business rules. Each rule should be enforceable and testable.
 ```markdown
 ## 10. Invariants
 
-1. **Currency is fixed at creation** — `currency_code` is required on `CreateCart`
+1. **Currency is fixed at creation** — `currencyCode` is required on `Create Cart`
    and treated as create-only thereafter.
-2. **LineItem requires `title`, `quantity`, `unit_price`** — missing any raises
+2. **Line Item requires `title`, `quantity`, `unitPrice`** — missing any raises
    `INVALID_DATA`.
-3. **Set-replacement for adjustments** — `SetLineItemAdjustments` always replaces
+3. **Set-replacement for adjustments** — `Set Line Item Adjustments` always replaces
    the entire collection. Passing `[]` clears all adjustments. You cannot patch a
    single adjustment.
 4. **Adjustments target owned children only** — adding an adjustment for a line
@@ -260,17 +264,17 @@ A table of fields that point to other aggregates by ID only.
 ```markdown
 ## 11. External References
 
-| Field                           | Points to                       |
-|---------------------------------|---------------------------------|
-| Cart.customer_id                | Customer aggregate              |
-| Cart.region_id                  | Region aggregate                |
-| LineItem.variant_id             | Product aggregate (snapshotted) |
-| LineItemAdjustment.promotion_id | Promotion aggregate             |
+| Field                          | Points to                       |
+|--------------------------------|---------------------------------|
+| Cart.customerId                | Customer aggregate              |
+| Cart.regionId                  | Region aggregate                |
+| LineItem.variantId             | Product aggregate (snapshotted) |
+| LineItemAdjustment.promotionId | Promotion aggregate             |
 
 Cross-aggregate orchestration that is out of scope but exists in the codebase:
 - **Cart completion** → Order aggregate (workflow in `core-flows/.../complete-cart.ts`).
 - **Promotion evaluation** → Promotion aggregate computes adjustments, then calls
-  `SetLineItemAdjustments`.
+  `Set Line Item Adjustments`.
 ```
 
 The second block — out-of-scope orchestration — is valuable even though those
