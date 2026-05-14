@@ -69,8 +69,9 @@ In this example we model Order Item as a **value object** (no `id`) — the line
 create_entities(workflowId: "wf-1", entities: [
   {
     name: "Order",
+    description: "Customer order aggregate root that represents the customer's order and governs its lifecycle from item addition and placement through payment outcome and shipment",
     boundedContext: "Order Management",
-    fields: [{ name: "id" }],
+    fields: [{ name: "id", description: "Unique identifier for the order", isRequired: true }],
     aggregateRootFor: [
       "#/domainEvents/ItemAddedToOrder",
       "#/domainEvents/OrderPlaced",
@@ -79,7 +80,7 @@ create_entities(workflowId: "wf-1", entities: [
       "#/domainEvents/OrderShipped"
     ]
   },
-  { name: "Order Item", boundedContext: "Order Management", fields: [] }
+  { name: "Order Item", description: "Immutable line item representing a single product, quantity, and unit price within an order", boundedContext: "Order Management", fields: [] }
 ])
 -> Order is an entity ($ref under #/schemas/entities/Order)
 -> Order Item is a value object ($ref under #/schemas/valueObjects/OrderItem)
