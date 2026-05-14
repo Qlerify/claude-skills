@@ -71,7 +71,7 @@ create_entities(workflowId: "wf-1", entities: [
     name: "Order",
     description: "Customer order aggregate root that represents the customer's order and governs its lifecycle from item addition and placement through payment outcome and shipment",
     boundedContext: "Order Management",
-    fields: [{ name: "id", description: "Entity ID", isRequired: true }],
+    fields: [{ name: "id", description: "Unique identifier for the order", isRequired: true }],
     aggregateRootFor: [
       "#/domainEvents/ItemAddedToOrder",
       "#/domainEvents/OrderPlaced",

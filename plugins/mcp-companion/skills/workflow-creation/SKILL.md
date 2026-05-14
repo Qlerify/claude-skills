@@ -252,14 +252,14 @@ create_entities(workflowId: "wf-1", entities: [
     name: "Order",
     description: "Aggregate root representing a customer purchase and tracking its fulfilment lifecycle from placement to delivery.",
     boundedContext: "Order Management",
-    fields: [{ name: "id", description: "Entity ID", isRequired: true }],
+    fields: [{ name: "id", description: "Unique identifier for the order", isRequired: true }],
     aggregateRootFor: ["#/domainEvents/OrderPlaced", "#/domainEvents/OrderCancelled"]
   },
   {
     name: "Order Item",
     description: "Line item within an order capturing the product, quantity, and price at time of purchase.",
     boundedContext: "Order Management",
-    fields: [{ name: "id", description: "Entity ID", isRequired: true }]
+    fields: [{ name: "id", description: "Unique identifier for the order item", isRequired: true }]
   },
   {
     name: "Address",
