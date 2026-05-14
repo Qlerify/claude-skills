@@ -69,7 +69,7 @@ In this example we model Order Item as a **value object** (no `id`) — the line
 create_entities(workflowId: "wf-1", entities: [
   {
     name: "Order",
-    description: "Customer order aggregate root",
+    description: "Customer order aggregate root that represents the customer's order and governs its lifecycle from item addition and placement through payment outcome and shipment",
     boundedContext: "Order Management",
     fields: [{ name: "id", description: "Entity ID", isRequired: true }],
     aggregateRootFor: [
