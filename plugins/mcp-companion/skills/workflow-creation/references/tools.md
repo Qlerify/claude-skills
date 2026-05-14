@@ -200,7 +200,7 @@ Define one or more domain entities or value objects in a single atomic workflow 
   - `aggregateRootFor` — Optional. Array of `$ref` paths to events this entity is the aggregate root for (e.g., `["#/domainEvents/OrderPlaced"]`). Only entities with an `id` field can be aggregate roots.
   - `fields` — Optional. Array of field definitions:
     - `name` — Field name in camelCase (entities must always have one attribute named exactly `id`; value objects must never have a field named `id`)
-    - `description` — Short business-language description of the field. Add when the meaning, purpose, or role is non-obvious from the name; omit on self-explanatory fields like `id`, `name`, `email`.
+    - `description` — Required. Short business-language description of the field. Include one for every field; for self-explanatory fields like `id`, `name`, or `email`, keep it brief and precise.
     - `dataType` — One of: `string`, `number`, `boolean`, `object`
     - `exampleData` — Array of 3 realistic example values
     - `isRequired` — Whether the field is mandatory (true/false)
