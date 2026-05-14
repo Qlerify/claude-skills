@@ -61,7 +61,7 @@ fill empty sections.
 | 9   | Read Models / Queries                                     | yes                                |
 | 10  | Invariants                                                | yes                                |
 | 11  | External References                                       | only if any                        |
-| 12  | Tests (Given/When/Then)                                   | yes if tests exist in the codebase |
+| 12  | Tests (Given/When/Then)                                   | yes                                |
 
 Use the numbering only as a guide — the actual section numbers should match the
 structure of the specific aggregate.
