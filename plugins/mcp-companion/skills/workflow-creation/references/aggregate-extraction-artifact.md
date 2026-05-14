@@ -210,7 +210,7 @@ that are derived on read.
 ```markdown
 ## 9. Read Models / Queries
 
-### Query: GetCart
+### Query: Get Cart
 
 Inputs: `cartId`, optional relation selectors.
 
