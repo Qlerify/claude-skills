@@ -46,22 +46,22 @@ The artifact has the following sections. **Sections scale with content** — omi
 sections that don't apply for the aggregate at hand, and do not invent content to
 fill empty sections.
 
-| # | Section | Required? |
-|---|---|---|
-| — | Title + source pointers | yes |
-| 1 | Aggregate Hierarchy | yes |
-| 2 | Aggregate Root | yes |
-| 3 | Value Objects on the root | only if any |
-| 4 | Related Entities | only if any |
-| 4.x | Value Objects nested under related entities | only if any |
-| 5 | Additional related entities (e.g. shipping, credit lines) | only if any |
-| 6 | (continuation of related entities as needed) | only if any |
-| 7 | Commands | yes |
-| 8 | Domain Events | yes |
-| 9 | Read Models / Queries | yes |
-| 10 | Invariants | yes |
-| 11 | External References | only if any |
-| 12 | Tests (Given/When/Then) | yes if tests exist in the codebase |
+| #   | Section                                                   | Required?                          |
+|-----|-----------------------------------------------------------|------------------------------------|
+| —   | Title + source pointers                                   | yes                                |
+| 1   | Aggregate Hierarchy                                       | yes                                |
+| 2   | Aggregate Root                                            | yes                                |
+| 3   | Value Objects on the root                                 | only if any                        |
+| 4   | Related Entities                                          | only if any                        |
+| 4.x | Value Objects nested under related entities               | only if any                        |
+| 5   | Additional related entities (e.g. shipping, credit lines) | only if any                        |
+| 6   | (continuation of related entities as needed)              | only if any                        |
+| 7   | Commands                                                  | yes                                |
+| 8   | Domain Events                                             | yes                                |
+| 9   | Read Models / Queries                                     | yes                                |
+| 10  | Invariants                                                | yes                                |
+| 11  | External References                                       | only if any                        |
+| 12  | Tests (Given/When/Then)                                   | yes if tests exist in the codebase |
 
 Use the numbering only as a guide — the actual section numbers should match the
 structure of the specific aggregate.
@@ -131,14 +131,14 @@ and pricing artefacts until it is either abandoned or converted to an order.
 
 ### Attributes (Cart)
 
-| Attribute | Type | Req | Default | Notes |
-|---|---|---|---|---|
-| id | string | yes (system-generated) | — | Prefix `cart_`. Create-only. |
-| currency_code | string (ISO-4217) | yes | — | Normalised to lower-case. Create-only. |
-| customer_id | string \| null | no | null | External reference → Customer aggregate. |
-| email | string \| null | no | null | Email of the buyer. |
-| items | LineItem[] | no | [] | Owned collection, see §4. |
-| ... | | | | |
+| Attribute     | Type              | Req                    | Default | Notes                                    |
+|---------------|-------------------|------------------------|---------|------------------------------------------|
+| id            | string            | yes (system-generated) | —       | Prefix `cart_`. Create-only.             |
+| currency_code | string (ISO-4217) | yes                    | —       | Normalised to lower-case. Create-only.   |
+| customer_id   | string \| null    | no                     | null    | External reference → Customer aggregate. |
+| email         | string \| null    | no                     | null    | Email of the buyer.                      |
+| items         | LineItem[]        | no                     | []      | Owned collection, see §4.                |
+| ...           |                   |                        |         |                                          |
 ```
 
 Note rollup/computed fields as **projections** in the read-model section, NOT here.
@@ -165,11 +165,11 @@ The Cart aggregate exposes **N commands**. Each has a 1:1 domain event.
 Workflow-level orchestration (promotion evaluation, tax calculation, order
 creation) is explicitly **not** an aggregate command.
 
-| # | Command | Payload (aggregate-facing) | Notes |
-|---|---|---|---|
-| 1 | **CreateCart** | `currency_code`, `region_id?`, `customer_id?`, `email?`, `items?` | Atomic: may seed items. |
-| 2 | **AddLineItem** | `cartId`, `items: LineItem[]` | Creates entities. |
-| ... | | | |
+| #   | Command         | Payload (aggregate-facing)                                        | Notes                   |
+|-----|-----------------|-------------------------------------------------------------------|-------------------------|
+| 1   | **CreateCart**  | `currency_code`, `region_id?`, `customer_id?`, `email?`, `items?` | Atomic: may seed items. |
+| 2   | **AddLineItem** | `cartId`, `items: LineItem[]`                                     | Creates entities.       |
+| ... |                 |                                                                   |                         |
 
 **Commands explicitly merged or omitted:**
 - `addLineItemAdjustments` — merged into `SetLineItemAdjustments`; per CLAUDE.md,
@@ -191,11 +191,11 @@ A 1:1 table mapping each command to its event.
 ```markdown
 ## 8. Domain Events
 
-| # | Event | Emitted by |
-|---|---|---|
-| 1 | CartCreated | CreateCart |
-| 2 | LineItemAdded | AddLineItem |
-| ... | | |
+| #   | Event         | Emitted by  |
+|-----|---------------|-------------|
+| 1   | CartCreated   | CreateCart  |
+| 2   | LineItemAdded | AddLineItem |
+| ... |               |             |
 ```
 
 ### Section 9: Read Models / Queries
@@ -212,17 +212,17 @@ Inputs: `cartId`, optional relation selectors.
 
 Returns the full Cart plus computed fields:
 
-| Field | Description |
-|---|---|
-| total | Final payable amount (items + shipping + tax − discounts). |
-| subtotal | item_subtotal + shipping_subtotal (pre-tax, after discounts). |
-| discount_total | Sum of all adjustment amounts. |
-| ... | |
+| Field          | Description                                                   |
+|----------------|---------------------------------------------------------------|
+| total          | Final payable amount (items + shipping + tax − discounts).    |
+| subtotal       | item_subtotal + shipping_subtotal (pre-tax, after discounts). |
+| discount_total | Sum of all adjustment amounts.                                |
+| ...            |                                                               |
 
 ### Secondary Queries
 
-| Query | Purpose |
-|---|---|
+| Query             | Purpose                                |
+|-------------------|----------------------------------------|
 | ListCarts(filter) | Admin listing / customer cart history. |
 ```
 
@@ -260,12 +260,12 @@ A table of fields that point to other aggregates by ID only.
 ```markdown
 ## 11. External References
 
-| Field | Points to |
-|---|---|
-| Cart.customer_id | Customer aggregate |
-| Cart.region_id | Region aggregate |
-| LineItem.variant_id | Product aggregate (snapshotted) |
-| LineItemAdjustment.promotion_id | Promotion aggregate |
+| Field                           | Points to                       |
+|---------------------------------|---------------------------------|
+| Cart.customer_id                | Customer aggregate              |
+| Cart.region_id                  | Region aggregate                |
+| LineItem.variant_id             | Product aggregate (snapshotted) |
+| LineItemAdjustment.promotion_id | Promotion aggregate             |
 
 Cross-aggregate orchestration that is out of scope but exists in the codebase:
 - **Cart completion** → Order aggregate (workflow in `core-flows/.../complete-cart.ts`).
