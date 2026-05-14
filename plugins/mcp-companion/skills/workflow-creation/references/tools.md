@@ -163,7 +163,7 @@ existing workflow. For building a new workflow with many events, use `create_dom
 
 ### update_domain_event
 
-Modify an existing domain event — change its name, lane, color, group, aggregate root, or acceptance criteria.
+Modify an existing domain event — change its name, lane, color, condition label, group, aggregate root, or acceptance criteria.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `domainEvent` — `$ref` path to the event (e.g., `#/domainEvents/OrderPlaced`)
@@ -414,7 +414,7 @@ Attach a card to an event. Only needed for card types not managed by dedicated t
 
 ### update_card
 
-Modify a card's content. Cards are identified by their event and current text.
+Modify a card — change its content or card type. Cards are identified by their event and current text.
 
 - `workflowId`, `projectId` — Identifies the workflow
 - `domainEvent` — `$ref` path to the event the card is on
