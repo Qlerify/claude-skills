@@ -291,13 +291,13 @@ language as Given/When/Then. Group by command.
 
 Extracted from `{path to integration tests}`. Rephrased in business language.
 
-### CreateCart
+### Create Cart
 - Given no cart exists, When the caller creates a cart with currency code EUR,
   Then a cart is returned with an assigned id and currency code EUR.
 - Given no cart exists, When the caller creates a cart without a currency code,
   Then the command is rejected with a required-field error on currency_code.
 
-### AddLineItem
+### Add Line Item
 - Given a cart exists, When the caller adds a line item with quantity 1 and unit
   price 100, Then the cart contains exactly one line item with those values.
 - Given a cart id that does not exist, When the caller adds a line item, Then
