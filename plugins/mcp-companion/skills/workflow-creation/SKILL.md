@@ -530,12 +530,6 @@ with `relatedEntity`.
 - **Include realistic example data.** 3 values per field helps stakeholders understand the model.
 - **After completing the workflow, use the `/download` skill** to save the specification to a file. This is much faster than fetching via MCP tools for large workflows.
 
-## Common mistakes
-
-Recurring errors observed across past runs. Treat each item as a red flag to actively avoid — not just a rule, but a known failure mode. Re-read this list before reporting done.
-
-_(Empty — populated over time from skill self-improvement retros.)_
-
 ## When to suggest user feedback
 
 Real users hit issues we never see in internal testing — recurring corrections on the same topic, frustration with a step, or ideas for things the tool could do. Capture those by offering to send a feedback report. The bar for offering is intentionally high — most corrections are normal collaboration, not feedback-worthy.
@@ -566,10 +560,6 @@ Real users hit issues we never see in internal testing — recurring corrections
 4. Only after explicit approval, call the `send_feedback` MCP tool.
 
 Never send silently. Never send without classification. Never send domain content the user hasn't seen in the draft preview.
-
-## Skill self-improvement
-
-Before reporting done, name the single most confusing or missing piece of this skill in this run, and propose one concrete edit (a specific line or section of `SKILL.md` or a reference file, with the new wording). If the proposed edit captures a recurring error rather than a missing rule, propose it as a new entry under "Common mistakes". If nothing stood out, say so explicitly. The user accepts or discards the proposal on the spot — do not modify the skill yourself.
 
 ## Additional Resources
 
