@@ -56,7 +56,7 @@ When a query has a field that contains a nested structure of data from a differe
 
 ## Nesting Depth
 
-Nesting is limited to ONE level deep. Inside an already-nested field (e.g., `items`, `cartItems`, `shippingAddress`), sub-fields must NOT themselves contain a `fields` array. If a sub-field represents a related entity or collection (e.g., `adjustments`, `taxLines`), include it by name and `cardinality` only — do NOT specify its `fields`.
+Nesting can go up to three levels deep total: a top-level field referencing a related entity or value object (e.g., `cartItems`, `shippingAddress`), its sub-fields, and — when a sub-field itself references a related entity or collection worth displaying (e.g., `cartItems` → `adjustment`, `orderItems` → `product`) — that sub-field may in turn set `relatedEntity` and carry its own `fields` array. Do not nest deeper than three levels; at the third level list sub-fields by name only, without a further `fields` array. Set `cardinality` on every nested related-entity field: `"one-to-many"` for collections (e.g., `cartItems`), `"one-to-one"` for single objects (e.g., `shippingAddress`). When a field is only an id reference to another entity (usually in another bounded context), name it `{entityName}Id` in camelCase (e.g., `customerId`, `productId`) with no nested fields.
 
 ## Important Rules
 
@@ -104,6 +104,18 @@ The read model shows the actor the data they need BEFORE executing the command:
         {
           "name": "unitPrice",
           "description": "Price per unit at the time the item was added."
+        },
+        {
+          "name": "adjustment",
+          "relatedEntity": "#/schemas/entities/Adjustment",
+          "cardinality": "one-to-one",
+          "fields": [
+            { "name": "amount" },
+            {
+              "name": "code",
+              "description": "Promotion or discount code applied to this line item."
+            }
+          ]
         }
       ]
     },
